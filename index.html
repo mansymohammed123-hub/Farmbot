@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="FarmBot"/>
+<meta name="theme-color" content="#0f1219"/>
+<title>FarmBot Command Center</title>
+<link rel="manifest" id="manifest-placeholder"/>
+<link rel="apple-touch-icon" id="apple-icon-placeholder"/>
+<script>
+// ── PWA: Inline Manifest ──────────────────────────────────────────────────────
+(function(){
+  // Generate SVG icon as data URI
+  const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="96" fill="#0f1219"/>
+    <rect x="32" y="32" width="448" height="448" rx="72" fill="#161b27"/>
+    <!-- Wheat stalk left -->
+    <line x1="160" y1="400" x2="160" y2="180" stroke="#4ecdc4" stroke-width="8" stroke-linecap="round"/>
+    <ellipse cx="140" cy="220" rx="22" ry="38" fill="#2ecc71" opacity="0.9" transform="rotate(-20 140 220)"/>
+    <ellipse cx="178" cy="260" rx="22" ry="38" fill="#2ecc71" opacity="0.9" transform="rotate(20 178 260)"/>
+    <ellipse cx="138" cy="300" rx="22" ry="38" fill="#2ecc71" opacity="0.9" transform="rotate(-15 138 300)"/>
+    <!-- Wheat stalk center -->
+    <line x1="256" y1="400" x2="256" y2="160" stroke="#4ecdc4" stroke-width="8" stroke-linecap="round"/>
+    <ellipse cx="234" cy="200" rx="22" ry="40" fill="#2ecc71" opacity="0.9" transform="rotate(-20 234 200)"/>
+    <ellipse cx="276" cy="245" rx="22" ry="40" fill="#2ecc71" opacity="0.9" transform="rotate(20 276 245)"/>
+    <ellipse cx="232" cy="292" rx="22" ry="40" fill="#2ecc71" opacity="0.9" transform="rotate(-15 232 292)"/>
+    <!-- Wheat stalk right -->
+    <line x1="352" y1="400" x2="352" y2="180" stroke="#4ecdc4" stroke-width="8" stroke-linecap="round"/>
+    <ellipse cx="330" cy="222" rx="22" ry="38" fill="#2ecc71" opacity="0.9" transform="rotate(-20 330 222)"/>
+    <ellipse cx="372" cy="262" rx="22" ry="38" fill="#2ecc71" opacity="0.9" transform="rotate(20 372 262)"/>
+    <ellipse cx="328" cy="302" rx="22" ry="38" fill="#2ecc71" opacity="0.9" transform="rotate(-15 328 302)"/>
+    <!-- Ground line -->
+    <line x1="80" y1="400" x2="432" y2="400" stroke="#4ecdc4" stroke-width="6" stroke-linecap="round"/>
+    <!-- Robot dot -->
+    <circle cx="256" cy="430" r="18" fill="#00ffcc" opacity="0.9"/>
+    <circle cx="256" cy="430" r="10" fill="#0f1219"/>
+  </svg>`;
+
+  const iconDataUri = 'data:image/svg+xml;base64,' + btoa(iconSvg);
+
+  const manifest = {
+    name: "FarmBot Command Center",
+    short_name: "FarmBot",
+    description: "Autonomous farm robot mission planner and telemetry dashboard",
+    start_url: "./",
+    display: "standalone",
+    orientation: "portrait",
+    background_color: "#0f1219",
+    theme_color: "#0f1219",
+    icons: [
+      { src: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAAEeklEQVR42u3dQW7bQBBEUd4gQBYBghwguxzFd8kdvbTP5MABvHFiWRI5nO6pV8BfGhiw64uyxBltm4iIiIiIiAzJtx8/X67F1ZJly30UrrrElJ0UovCEEIUnhCg9GUTpySCKTwRRfCKI0pNBFJ8IovwkUHwQQfFBBMUHEZQfJFB8EEH5QQLlBwkUH0RQfpBA+UEC5QcJFB9EUH6QQPlBAuUHCZQfJFB+kED5QQLlBwmUHyQgAAig/CCB8oMEyg8SKD9IQAAQwNAQK4FhIVYCQ0K0BAaEWAEMB7ESGAqiJTAQxAow+0I8PD9eRYWhrbTOCmslAAEIkP7WhwDZ15QABCBA8j++BMi+plMkqPRpAAEIcLoEBCBArAAjFv/r6ffNzBjWPeu8da1p17SdBDMKdCt7h2Wdx681UoAzB/TZ8Kzz3LUuKUCXwl9zm7fO49e6vASdi48MEU4tv6GjogjDBTBkVBZB+REvwuECGCQ6SXCoAAaIbhIoP0hAACRLQAAQQPlBAgKAAARAngQEAAGUH94GEQAEIAAIQAD4RtjDb/Bw3CePPxsUIh+PJgAIQAKk7hKz9xer7RV28gOcGJFy9g9IMUwAEqCrGMsefQhCTBGACOgkwynHnxsSqopw+vn/BoVKIkz/9RcDw0wRSv/8kSFitAhtfvvLIDFFAuXH6hKUFsDgMFqCsgIYGM6QgAAggE+AkCoBAUCASgIYEM6UgAAgAAFAAAKAAPMlMByUKb+7AAhAABCABAj7DoAAiH4MwvNAIIBHopH6KLRNMYjfEul7AKy8MX73AbmKjuXLf6QABoMq5wKdJoChoOLJcMMFMBRUPA5xuAAGg6ql3/1TqcqPjmU/5IeyFR9dCn6qAAaJDqUfIoCBoqME270hALoLsO2J8iPy/T8BsIoEhwhgeIgU4E0Cw0NHAbYjQgAQwPCQKsBrDA/dBNiOjLsAYl/9CYB4AUiA6PL7TgBRn/2TAMrv0QikPftDAii/fQJIe+7fVkl03/V1mgDXbJjvMqROhVL8IuXvdmzKw/PjX1ZZ5+y1vq3z2rUuKcCe0+POHNCeYXVZ5+i1frTOSgJsszLjAN33f3NpQCOHdc/bg4rrrHRNW5W/ym8JdBrWSuskQBEJCJB7TbcKMSwCRAswWwICZF7TrVIMiwDRAsyUgAB513SrmhEXGeuzRPnvuQsYPpZ59ScB4stPAsSX3/8DiHrf7y4Ar/6FnxVCb7buMUTElp8EiC8/Cd4N9uXpQ1yfRctPgMvFJ0KAAKkS3FJ8Iixc/kQJ9pQ/UYItJcpPgtjyp0hwqdBfvn7/h2QBttSklf9/xb9WBOUnQWsBrin/JQmUnwTLv/on3QW0flEJ9pY/4S6g7QuLQADFj5aAAMofLQEBlD9aAgIof7QIBFB8EoR/D6Ct4RIkfxOspUS4W4LO5ddKEsQ+DaqNRIjcD6B9RIjcEaZtRIjcE6xdJIg9FUKriGCTupBB6YUIii9EUHwhg9ILGZReCKHwQgiFF1Iou8geSVwtERERERmUP56d6XbMoPcGAAAAAElFTkSuQmCC", sizes: "192x192", type: "image/png", purpose: "any maskable" },
+      { src: "data:image/png;base64,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", sizes: "512x512", type: "image/png", purpose: "any maskable" }
+    ]
+  };
+
+  const manifestBlob = new Blob([JSON.stringify(manifest)], {type:'application/manifest+json'});
+  const manifestUrl = URL.createObjectURL(manifestBlob);
+  document.getElementById('manifest-placeholder').href = manifestUrl;
+
+  // Set apple touch icon
+  const appleIcon = document.getElementById('apple-icon-placeholder');
+  appleIcon.href = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAAEeklEQVR42u3dQW7bQBBEUd4gQBYBghwguxzFd8kdvbTP5MABvHFiWRI5nO6pV8BfGhiw64uyxBltm4iIiIiIiAzJtx8/X67F1ZJly30UrrrElJ0UovCEEIUnhCg9GUTpySCKTwRRfCKI0pNBFJ8IovwkUHwQQfFBBMUHEZQfJFB8EEH5QQLlBwkUH0RQfpBA+UEC5QcJFB9EUH6QQPlBAuUHCZQfJFB+kED5QQLlBwmUHyQgAAig/CCB8oMEyg8SKD9IQAAQwNAQK4FhIVYCQ0K0BAaEWAEMB7ESGAqiJTAQxAow+0I8PD9eRYWhrbTOCmslAAEIkP7WhwDZ15QABCBA8j++BMi+plMkqPRpAAEIcLoEBCBArAAjFv/r6ffNzBjWPeu8da1p17SdBDMKdCt7h2Wdx681UoAzB/TZ8Kzz3LUuKUCXwl9zm7fO49e6vASdi48MEU4tv6GjogjDBTBkVBZB+REvwuECGCQ6SXCoAAaIbhIoP0hAACRLQAAQQPlBAgKAAARAngQEAAGUH94GEQAEIAAIQAD4RtjDb/Bw3CePPxsUIh+PJgAIQAKk7hKz9xer7RV28gOcGJFy9g9IMUwAEqCrGMsefQhCTBGACOgkwynHnxsSqopw+vn/BoVKIkz/9RcDw0wRSv/8kSFitAhtfvvLIDFFAuXH6hKUFsDgMFqCsgIYGM6QgAAggE+AkCoBAUCASgIYEM6UgAAgAAFAAAKAAPMlMByUKb+7AAhAABCABAj7DoAAiH4MwvNAIIBHopH6KLRNMYjfEul7AKy8MX73AbmKjuXLf6QABoMq5wKdJoChoOLJcMMFMBRUPA5xuAAGg6ql3/1TqcqPjmU/5IeyFR9dCn6qAAaJDqUfIoCBoqME270hALoLsO2J8iPy/T8BsIoEhwhgeIgU4E0Cw0NHAbYjQgAQwPCQKsBrDA/dBNiOjLsAYl/9CYB4AUiA6PL7TgBRn/2TAMrv0QikPftDAii/fQJIe+7fVkl03/V1mgDXbJjvMqROhVL8IuXvdmzKw/PjX1ZZ5+y1vq3z2rUuKcCe0+POHNCeYXVZ5+i1frTOSgJsszLjAN33f3NpQCOHdc/bg4rrrHRNW5W/ym8JdBrWSuskQBEJCJB7TbcKMSwCRAswWwICZF7TrVIMiwDRAsyUgAB513SrmhEXGeuzRPnvuQsYPpZ59ScB4stPAsSX3/8DiHrf7y4Ar/6FnxVCb7buMUTElp8EiC8/Cd4N9uXpQ1yfRctPgMvFJ0KAAKkS3FJ8Iixc/kQJ9pQ/UYItJcpPgtjyp0hwqdBfvn7/h2QBttSklf9/xb9WBOUnQWsBrin/JQmUnwTLv/on3QW0flEJ9pY/4S6g7QuLQADFj5aAAMofLQEBlD9aAgIof7QIBFB8EoR/D6Ct4RIkfxOspUS4W4LO5ddKEsQ+DaqNRIjcD6B9RIjcEaZtRIjcE6xdJIg9FUKriGCTupBB6YUIii9EUHwhg9ILGZReCKHwQgiFF1Iou8geSVwtERERERmUP56d6XbMoPcGAAAAAElFTkSuQmCC";
+
+  // ── Service Worker (offline cache) ─────────────────────────────────────────
+  if('serviceWorker' in navigator){
+    const swCode = `
+const CACHE = 'farmbot-v1';
+const SHELL = [
+  'https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js'
+];
+
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    ).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', e => {
+  // Cache-first for CDN assets; network-first for everything else
+  const isCDN = e.request.url.includes('cdnjs.cloudflare.com');
+  if(isCDN){
+    e.respondWith(
+      caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return res;
+      }))
+    );
+  } else {
+    e.respondWith(
+      fetch(e.request).catch(() => caches.match(e.request))
+    );
+  }
+});
+`;
+    const swBlob = new Blob([swCode], {type:'text/javascript'});
+    const swUrl = URL.createObjectURL(swBlob);
+    navigator.serviceWorker.register(swUrl, {scope: './'})
+      .then(reg => console.log('[FarmBot PWA] SW registered', reg.scope))
+      .catch(err => console.warn('[FarmBot PWA] SW failed (normal for file://)', err));
+  }
+})();
+</script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  body{background:#0f1219;font-family:Consolas,monospace;overscroll-behavior:none;}
+  button{font-family:Consolas,monospace;}
+  input{font-family:Consolas,monospace;}
+  ::-webkit-scrollbar{width:4px;}
+  ::-webkit-scrollbar-track{background:#0f1219;}
+  ::-webkit-scrollbar-thumb{background:#2a3347;border-radius:2px;}
+  #leaflet-map{width:100%;height:280px;border-radius:10px;z-index:1;}
+  .leaflet-container{background:#1a2030 !important;}
+  .leaflet-control-zoom{border:1px solid #2a3347 !important;}
+  .leaflet-control-zoom a{background:#161b27 !important;color:#4ecdc4 !important;border-color:#2a3347 !important;}
+</style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const {useState,useEffect,useRef,useCallback}=React;
+
+const TELEGRAM_TOKEN="8814940820:AAHSOHcjyKpGnqh-LYp2lLC-zY_vyO5sp9Q";
+const TELEGRAM_CHAT_ID="903665860";
+const ROBOT_DEFAULT_IP="10.237.194.94";
+const ROBOT_DEFAULT_PORT=8888;
+const INTERP_STEPS=20;
+
+const C={
+  bg:"#0f1219",panel:"#161b27",card:"#1e2535",accent:"#4ecdc4",
+  gps:"#00ffcc",warn:"#f39c12",err:"#e74c3c",ok:"#2ecc71",
+  txt:"#c8d6e5",dim:"#556070",white:"#ffffff",
+  enc1:"#00bfff",enc2:"#ffaa44",imuA:"#7fff7f",imuG:"#ffaa00",
+  compass:"#ff5722",dist:"#ffcc00",
+};
+
+function gpsToLocal(lat,lon,refLat,refLon){
+  const y=(lat-refLat)*111320.0;
+  const x=(lon-refLon)*(111320.0*Math.cos((refLat*Math.PI)/180));
+  return[x,y];
+}
+function localToGps(x,y,refLat,refLon){
+  const lat=refLat+y/111320.0;
+  const lon=refLon+x/(111320.0*Math.cos((refLat*Math.PI)/180));
+  return[lat,lon];
+}
+function haversineM([lat1,lon1],[lat2,lon2]){
+  const R=6371000;
+  const dLat=((lat2-lat1)*Math.PI)/180;
+  const dLon=((lon2-lon1)*Math.PI)/180;
+  const a=Math.sin(dLat/2)**2+Math.cos((lat1*Math.PI)/180)*Math.cos((lat2*Math.PI)/180)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function dist2d([x1,y1],[x2,y2]){return Math.sqrt((x1-x2)**2+(y1-y2)**2);}
+function isInPolygon([px,py],poly){
+  let inside=false;const n=poly.length;let[p1x,p1y]=poly[0];
+  for(let i=1;i<=n;i++){
+    const[p2x,p2y]=poly[i%n];
+    if(py>Math.min(p1y,p2y)&&py<=Math.max(p1y,p2y)&&px<=Math.max(p1x,p2x)){
+      if(p1y!==p2y){const xi=((py-p1y)*(p2x-p1x))/(p2y-p1y)+p1x;if(p1x===p2x||px<=xi)inside=!inside;}
+    }
+    [p1x,p1y]=[p2x,p2y];
+  }
+  return inside;
+}
+function lineIntersect([a,b],[c,d]){
+  const dxAB=a[0]-b[0],dyAB=a[1]-b[1];
+  const dxCD=c[0]-d[0],dyCD=c[1]-d[1];
+  const denom=dxAB*dyCD-dyAB*dxCD;
+  if(denom===0)return null;
+  const det1=a[0]*b[1]-a[1]*b[0];
+  const det2=c[0]*d[1]-c[1]*d[0];
+  const x=(det1*dxCD-dxAB*det2)/denom;
+  const y=(det1*dyCD-dyAB*det2)/denom;
+  const inSeg=(seg,px,py)=>
+    Math.min(seg[0][0],seg[1][0])-1e-6<=px&&px<=Math.max(seg[0][0],seg[1][0])+1e-6&&
+    Math.min(seg[0][1],seg[1][1])-1e-6<=py&&py<=Math.max(seg[0][1],seg[1][1])+1e-6;
+  if(inSeg([a,b],x,y)&&inSeg([c,d],x,y))return[x,y];
+  return null;
+}
+function generateRows(polygon,spacing=2){
+  const rows=[];
+  if(polygon.length<3)return rows;
+  const xs=polygon.map(p=>p[0]),ys=polygon.map(p=>p[1]);
+  const[minX,maxX,minY,maxY]=[Math.min(...xs),Math.max(...xs),Math.min(...ys),Math.max(...ys)];
+  for(let x=minX+spacing/2;x<maxX;x+=spacing){
+    const vline=[[x,minY-10],[x,maxY+10]];
+    let intersections=[];
+    for(let i=0;i<polygon.length;i++){
+      const pt=lineIntersect(vline,[polygon[i],polygon[(i+1)%polygon.length]]);
+      if(pt&&!intersections.some(u=>Math.abs(u[0]-pt[0])<1e-5&&Math.abs(u[1]-pt[1])<1e-5))
+        intersections.push(pt);
+    }
+    intersections.sort((a,b)=>a[1]-b[1]);
+    for(let i=0;i<intersections.length-1;i+=2){
+      const s=[+intersections[i][0].toFixed(6),+intersections[i][1].toFixed(6)];
+      const e=[+intersections[i+1][0].toFixed(6),+intersections[i+1][1].toFixed(6)];
+      if(isInPolygon([(s[0]+e[0])/2,(s[1]+e[1])/2],polygon))rows.push([s,e]);
+    }
+  }
+  return rows;
+}
+function planBoustrophedon(rows,start){
+  if(!rows.length)return[];
+  let bestDist=Infinity,firstIdx=0,startAtEnd=false;
+  rows.forEach(([r1,r2],i)=>{
+    [r1,r2].forEach((pt,j)=>{
+      const d=dist2d(start,pt);
+      if(d<bestDist){bestDist=d;firstIdx=i;startAtEnd=j===1;}
+    });
+  });
+  const wps=[];let goEnd=startAtEnd;
+  const addRow=(row)=>{
+    let[p1,p2]=row;
+    if(p1[1]>p2[1])[p1,p2]=[p2,p1];
+    wps.push(...(goEnd?[p2,p1]:[p1,p2]));
+    goEnd=!goEnd;
+  };
+  for(let i=firstIdx;i<rows.length;i++)addRow(rows[i]);
+  for(let i=firstIdx-1;i>=0;i--)addRow(rows[i]);
+  return[start,...wps];
+}
+function interpolateSeg(p1,p2,steps=INTERP_STEPS){
+  return Array.from({length:steps+1},(_,i)=>[
+    p1[0]+(i/steps)*(p2[0]-p1[0]),
+    p1[1]+(i/steps)*(p2[1]-p1[1]),
+  ]);
+}
+async function sendTelegram(msg){
+  try{
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`,{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({chat_id:TELEGRAM_CHAT_ID,text:msg}),
+    });
+  }catch{}
+}
+
+function Card({title,titleColor=C.accent,children,style}){
+  return React.createElement('div',{style:{background:C.panel,border:'1px solid #2a3347',borderRadius:10,marginBottom:10,overflow:'hidden',...style}},
+    title&&React.createElement('div',{style:{padding:'6px 12px',borderBottom:'1px solid #2a3347',fontSize:11,fontWeight:700,color:titleColor,letterSpacing:'0.05em'}},title),
+    React.createElement('div',{style:{padding:'8px 12px'}},children)
+  );
+}
+function Row({label,value,valueColor=C.accent}){
+  return React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}},
+    React.createElement('span',{style:{fontSize:11,color:C.dim}},label),
+    React.createElement('span',{style:{fontSize:11,color:valueColor,fontWeight:700}},value)
+  );
+}
+function Btn({label,onClick,color=C.accent,disabled,style}){
+  return React.createElement('button',{onClick,disabled,style:{background:C.card,color:disabled?C.dim:color,border:`1px solid ${disabled?'#2a3347':color+'55'}`,borderRadius:7,padding:'9px 10px',fontSize:12,fontWeight:700,cursor:disabled?'not-allowed':'pointer',width:'100%',textAlign:'left',marginBottom:6,opacity:disabled?0.5:1,...style}},label);
+}
+function SectionHeader({label}){
+  return React.createElement('div',{style:{fontSize:10,color:C.dim,letterSpacing:'0.12em',fontWeight:700,padding:'14px 0 4px',textTransform:'uppercase'}},label);
+}
+function ProgressBar({value,max}){
+  const pct=max>0?Math.min(100,(value/max)*100):0;
+  return React.createElement('div',{style:{background:C.card,borderRadius:4,height:6,margin:'4px 0'}},
+    React.createElement('div',{style:{background:C.accent,width:`${pct}%`,height:'100%',borderRadius:4,transition:'width 0.3s'}})
+  );
+}
+function LogBox({entries}){
+  const ref=useRef(null);
+  useEffect(()=>{if(ref.current)ref.current.scrollTop=ref.current.scrollHeight;},[entries]);
+  return React.createElement('div',{ref,style:{background:'#080c10',borderRadius:7,padding:'6px 8px',height:100,overflowY:'auto',fontSize:10,color:C.accent}},
+    entries.map((e,i)=>React.createElement('div',{key:i},e))
+  );
+}
+function Compass({deg}){
+  const r=38,cx=45,cy=45;
+  const rad=((deg-90)*Math.PI)/180;
+  const nx=cx+(r-8)*Math.cos(rad);
+  const ny=cy+(r-8)*Math.sin(rad);
+  const bx=cx-12*Math.cos(rad);
+  const by=cy-12*Math.sin(rad);
+  return React.createElement('svg',{width:90,height:90,style:{display:'block',margin:'0 auto'}},
+    React.createElement('circle',{cx,cy,r,fill:'none',stroke:C.dim,strokeWidth:1}),
+    [['N',0],['E',90],['S',180],['W',270]].map(([l,a])=>{
+      const ar=((a-90)*Math.PI)/180;
+      return React.createElement('text',{key:l,x:cx+(r+8)*Math.cos(ar),y:cy+(r+8)*Math.sin(ar),fill:C.dim,fontSize:8,textAnchor:'middle',dominantBaseline:'middle'},l);
+    }),
+    React.createElement('defs',null,
+      React.createElement('marker',{id:'arr',markerWidth:6,markerHeight:6,refX:3,refY:3,orient:'auto'},
+        React.createElement('path',{d:'M0,0 L6,3 L0,6 Z',fill:C.compass})
+      )
+    ),
+    React.createElement('line',{x1:cx,y1:cy,x2:nx,y2:ny,stroke:C.compass,strokeWidth:3,markerEnd:'url(#arr)'}),
+    React.createElement('line',{x1:cx,y1:cy,x2:bx,y2:by,stroke:C.dim,strokeWidth:2})
+  );
+}
+
+const TABS=[{id:'telemetry',icon:'📡'},{id:'map',icon:'🗺'},{id:'mission',icon:'⚙'}];
+
+function MapCanvas({boundary,startPt,rows,waypoints,robotPos,donePath,refLatLon,onMapClick,mode}){
+  const mapRef=useRef(null);
+  const leafletRef=useRef(null);
+  const layersRef=useRef({boundary:null,rows:null,waypoints:null,done:null,robot:null,start:null,pts:[]});
+
+  useEffect(()=>{
+    if(leafletRef.current)return;
+    const map=L.map('leaflet-map',{center:[30.0444,31.2357],zoom:18,zoomControl:true});
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      attribution:'© OpenStreetMap',maxZoom:22,
+    }).addTo(map);
+    // Also add satellite option
+    const sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+      attribution:'© Esri',maxZoom:22,
+    });
+    L.control.layers({'Street':L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:22}).addTo(map),'Satellite':sat},{},{position:'topright'}).addTo(map);
+    map.on('click',(e)=>{
+      if(onMapClick)onMapClick([e.latlng.lat,e.latlng.lng]);
+    });
+    leafletRef.current=map;
+  },[]);
+
+  // Update onMapClick ref when it changes
+  useEffect(()=>{
+    if(!leafletRef.current)return;
+    leafletRef.current.off('click');
+    leafletRef.current.on('click',(e)=>{
+      if(onMapClick)onMapClick([e.latlng.lat,e.latlng.lng]);
+    });
+  },[onMapClick,mode]);
+
+  // Draw boundary
+  useEffect(()=>{
+    const map=leafletRef.current;if(!map)return;
+    const L2=layersRef.current;
+    if(L2.boundary){map.removeLayer(L2.boundary);}
+    L2.pts.forEach(m=>map.removeLayer(m));L2.pts=[];
+    if(boundary.length>=3){
+      L2.boundary=L.polygon(boundary,{color:'#4ecdc4',weight:2,fillColor:'#4ecdc4',fillOpacity:0.1}).addTo(map);
+    }
+    boundary.forEach(([lat,lon])=>{
+      const m=L.circleMarker([lat,lon],{radius:5,color:'#4ecdc4',fillColor:'#4ecdc4',fillOpacity:1}).addTo(map);
+      L2.pts.push(m);
+    });
+    if(boundary.length>0&&!leafletRef.current._farmbot_centered){
+      map.setView(boundary[0],19);
+      if(boundary.length>=3)leafletRef.current._farmbot_centered=true;
+    }
+  },[boundary]);
+
+  // Draw rows
+  useEffect(()=>{
+    const map=leafletRef.current;if(!map||!refLatLon)return;
+    const L2=layersRef.current;
+    if(L2.rows){map.removeLayer(L2.rows);}
+    if(!rows.length)return;
+    const[refLat,refLon]=refLatLon;
+    const lines=rows.map(([r1,r2])=>[localToGps(r1[0],r1[1],refLat,refLon),localToGps(r2[0],r2[1],refLat,refLon)]);
+    L2.rows=L.polyline(lines,{color:'#2ecc71',weight:1.5,opacity:0.8}).addTo(map);
+  },[rows,refLatLon]);
+
+  // Draw waypoints path
+  useEffect(()=>{
+    const map=leafletRef.current;if(!map||!refLatLon)return;
+    const L2=layersRef.current;
+    if(L2.waypoints){map.removeLayer(L2.waypoints);}
+    if(waypoints.length<2)return;
+    const[refLat,refLon]=refLatLon;
+    const pts=waypoints.map(wp=>localToGps(wp[0],wp[1],refLat,refLon));
+    L2.waypoints=L.polyline(pts,{color:'#f39c12',weight:1.5,dashArray:'4,3',opacity:0.8}).addTo(map);
+  },[waypoints,refLatLon]);
+
+  // Draw done path
+  useEffect(()=>{
+    const map=leafletRef.current;if(!map)return;
+    const L2=layersRef.current;
+    if(L2.done){map.removeLayer(L2.done);}
+    if(donePath.length<2)return;
+    L2.done=L.polyline(donePath,{color:'#ffffff',weight:2}).addTo(map);
+  },[donePath]);
+
+  // Draw start point
+  useEffect(()=>{
+    const map=leafletRef.current;if(!map)return;
+    const L2=layersRef.current;
+    if(L2.start){map.removeLayer(L2.start);}
+    if(!startPt)return;
+    L2.start=L.circleMarker(startPt,{radius:8,color:'#f39c12',fillColor:'#f39c12',fillOpacity:0.7}).bindTooltip('S',{permanent:true,direction:'center',className:''}).addTo(map);
+  },[startPt]);
+
+  // Draw robot position
+  useEffect(()=>{
+    const map=leafletRef.current;if(!map)return;
+    const L2=layersRef.current;
+    if(L2.robot){map.removeLayer(L2.robot);}
+    if(!robotPos)return;
+    L2.robot=L.circleMarker(robotPos,{radius:10,color:'#00ffcc',fillColor:'#00ffcc',fillOpacity:0.8}).bindTooltip('🚜',{permanent:true,direction:'center'}).addTo(map);
+    map.panTo(robotPos);
+  },[robotPos]);
+
+  // Center on GPS if available
+  useEffect(()=>{
+    if(!refLatLon||!leafletRef.current)return;
+    // don't auto-pan after user interaction
+  },[refLatLon]);
+
+  return React.createElement('div',{id:'leaflet-map',style:{cursor:mode==='boundary'?'crosshair':'grab'}});
+}
+
+const TABS=[{id:'telemetry',icon:'📡'},{id:'map',icon:'🗺'},{id:'mission',icon:'⚙'}];
+
+function MapCanvas({boundary,startPt,rows,waypoints,robotPos,donePath,refLatLon,onMapClick,mode}){
+  const canvasRef=useRef(null);
+  const[pan,setPan]=useState({x:0,y:0});
+  const[scale,setScale]=useState(150);
+  const dragging=useRef(false);
+  const lastPos=useRef(null);
+  const didDrag=useRef(false);
+
+  const toScreen=useCallback(([lat,lon])=>{
+    if(!refLatLon)return[0,0];
+    const[refLat,refLon]=refLatLon;
+    const[lx,ly]=gpsToLocal(lat,lon,refLat,refLon);
+    const canvas=canvasRef.current;
+    if(!canvas)return[0,0];
+    const cx=canvas.width/2+pan.x+lx*scale;
+    const cy=canvas.height/2+pan.y-ly*scale;
+    return[cx,cy];
+  },[refLatLon,pan,scale]);
+
+  const fromScreen=useCallback((sx,sy)=>{
+    const canvas=canvasRef.current;
+    if(!canvas||!refLatLon)return null;
+    const[refLat,refLon]=refLatLon;
+    const lx=(sx-canvas.width/2-pan.x)/scale;
+    const ly=-(sy-canvas.height/2-pan.y)/scale;
+    return localToGps(lx,ly,refLat,refLon);
+  },[refLatLon,pan,scale]);
+
+  useEffect(()=>{
+    const canvas=canvasRef.current;
+    if(!canvas)return;
+    const ctx=canvas.getContext('2d');
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle=C.bg;ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.strokeStyle='#1a2030';ctx.lineWidth=0.5;
+    const step=50;
+    for(let x=0;x<canvas.width;x+=step){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}
+    for(let y=0;y<canvas.height;y+=step){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
+    if(!refLatLon){
+      ctx.fillStyle=C.dim;ctx.font='12px Consolas';ctx.textAlign='center';
+      ctx.fillText('Tap map to add boundary points',canvas.width/2,canvas.height/2);
+      return;
+    }
+    rows.forEach(([r1,r2])=>{
+      const[refLat,refLon]=refLatLon;
+      const g1=localToGps(r1[0],r1[1],refLat,refLon);
+      const g2=localToGps(r2[0],r2[1],refLat,refLon);
+      const[x1,y1]=toScreen(g1);const[x2,y2]=toScreen(g2);
+      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);
+      ctx.strokeStyle=C.ok+'88';ctx.lineWidth=1.5;ctx.stroke();
+    });
+    if(waypoints.length>=2){
+      const[refLat,refLon]=refLatLon;
+      ctx.beginPath();
+      waypoints.forEach((wp,i)=>{
+        const gps=localToGps(wp[0],wp[1],refLat,refLon);
+        const[sx,sy]=toScreen(gps);
+        i===0?ctx.moveTo(sx,sy):ctx.lineTo(sx,sy);
+      });
+      ctx.strokeStyle=C.warn+'88';ctx.lineWidth=1.5;ctx.setLineDash([4,3]);ctx.stroke();ctx.setLineDash([]);
+    }
+    if(donePath.length>=2){
+      ctx.beginPath();
+      donePath.forEach(([lat,lon],i)=>{
+        const[sx,sy]=toScreen([lat,lon]);
+        i===0?ctx.moveTo(sx,sy):ctx.lineTo(sx,sy);
+      });
+      ctx.strokeStyle=C.white;ctx.lineWidth=2;ctx.stroke();
+    }
+    if(boundary.length>=3){
+      ctx.beginPath();
+      boundary.forEach(([lat,lon],i)=>{
+        const[sx,sy]=toScreen([lat,lon]);
+        i===0?ctx.moveTo(sx,sy):ctx.lineTo(sx,sy);
+      });
+      ctx.closePath();ctx.strokeStyle=C.accent;ctx.lineWidth=2;ctx.stroke();
+      ctx.fillStyle=C.accent+'18';ctx.fill();
+    }
+    boundary.forEach(([lat,lon])=>{
+      const[sx,sy]=toScreen([lat,lon]);
+      ctx.beginPath();ctx.arc(sx,sy,4,0,Math.PI*2);
+      ctx.fillStyle=C.accent;ctx.fill();
+    });
+    if(startPt){
+      const[sx,sy]=toScreen(startPt);
+      ctx.beginPath();ctx.arc(sx,sy,7,0,Math.PI*2);
+      ctx.fillStyle=C.warn+'aa';ctx.fill();
+      ctx.strokeStyle=C.warn;ctx.lineWidth=2;ctx.stroke();
+      ctx.fillStyle=C.white;ctx.font='bold 9px Consolas';ctx.textAlign='center';
+      ctx.fillText('S',sx,sy+3);
+    }
+    if(robotPos){
+      const[sx,sy]=toScreen(robotPos);
+      ctx.beginPath();ctx.arc(sx,sy,9,0,Math.PI*2);
+      ctx.fillStyle=C.gps+'cc';ctx.fill();
+      ctx.strokeStyle=C.gps;ctx.lineWidth=2;ctx.stroke();
+      ctx.fillStyle='#000';ctx.font='bold 11px serif';ctx.textAlign='center';
+      ctx.fillText('🚜',sx-1,sy+4);
+    }
+  },[boundary,startPt,rows,waypoints,robotPos,donePath,refLatLon,pan,scale,toScreen]);
+
+  const handleClick=(e)=>{
+    if(didDrag.current){didDrag.current=false;return;}
+    if(!onMapClick)return;
+    const rect=canvasRef.current.getBoundingClientRect();
+    const sx=e.clientX-rect.left;const sy=e.clientY-rect.top;
+    const gps=fromScreen(sx,sy);
+    if(gps)onMapClick(gps);
+  };
+
+  return React.createElement('div',{style:{position:'relative'}},
+    React.createElement('canvas',{
+      ref:canvasRef,width:360,height:280,
+      style:{display:'block',borderRadius:10,cursor:mode==='boundary'?'crosshair':'pointer',touchAction:'none'},
+      onClick:handleClick,
+      onMouseDown:(e)=>{dragging.current=true;didDrag.current=false;lastPos.current={x:e.clientX,y:e.clientY};},
+      onMouseMove:(e)=>{
+        if(!dragging.current)return;
+        didDrag.current=true;
+        setPan(p=>({x:p.x+e.clientX-lastPos.current.x,y:p.y+e.clientY-lastPos.current.y}));
+        lastPos.current={x:e.clientX,y:e.clientY};
+      },
+      onMouseUp:()=>{dragging.current=false;},
+      onTouchStart:(e)=>{
+        e.preventDefault();
+        dragging.current=false;didDrag.current=false;
+        lastPos.current={x:e.touches[0].clientX,y:e.touches[0].clientY};
+      },
+      onTouchMove:(e)=>{
+        e.preventDefault();
+        if(e.touches.length===1){
+          didDrag.current=true;
+          setPan(p=>({x:p.x+e.touches[0].clientX-lastPos.current.x,y:p.y+e.touches[0].clientY-lastPos.current.y}));
+          lastPos.current={x:e.touches[0].clientX,y:e.touches[0].clientY};
+        }
+      },
+      onTouchEnd:(e)=>{
+        e.preventDefault();
+        if(!didDrag.current&&onMapClick){
+          const rect=canvasRef.current.getBoundingClientRect();
+          const t=e.changedTouches[0];
+          const sx=t.clientX-rect.left;const sy=t.clientY-rect.top;
+          const gps=fromScreen(sx,sy);
+          if(gps)onMapClick(gps);
+        }
+        dragging.current=false;
+      },
+    }),
+    React.createElement('div',{style:{position:'absolute',top:6,right:6,display:'flex',gap:4}},
+      React.createElement('button',{onClick:()=>setScale(s=>Math.min(s*1.5,3000)),style:{background:C.card,color:C.accent,border:'1px solid #2a3347',borderRadius:5,width:28,height:28,fontSize:16,cursor:'pointer'}},'+'),
+      React.createElement('button',{onClick:()=>setScale(s=>Math.max(s/1.5,10)),style:{background:C.card,color:C.accent,border:'1px solid #2a3347',borderRadius:5,width:28,height:28,fontSize:16,cursor:'pointer'}},'−')
+    ),
+    React.createElement('div',{style:{position:'absolute',top:6,left:6,fontSize:10,color:C.dim}},
+      mode==='boundary'?'📐 Tap to add boundary':'📍 Tap to set start'
+    )
+  );
+}
+
+function FarmBotApp(){
+  const[tab,setTab]=useState('telemetry');
+  const[log,setLog]=useState(['[system] FarmBot Command Center ready.']);
+  const[ip,setIp]=useState(ROBOT_DEFAULT_IP);
+  const[port,setPort]=useState(String(ROBOT_DEFAULT_PORT));
+  const[connected,setConnected]=useState(false);
+  const[gpsLat,setGpsLat]=useState(null);
+  const[gpsLon,setGpsLon]=useState(null);
+  const[compassDeg,setCompassDeg]=useState(0);
+  const[enc1Pos,setEnc1Pos]=useState(null);
+  const[enc1Rpm,setEnc1Rpm]=useState(null);
+  const[enc2Pos,setEnc2Pos]=useState(null);
+  const[enc2Rpm,setEnc2Rpm]=useState(null);
+  const[distFront,setDistFront]=useState(null);
+  const[distLeft,setDistLeft]=useState(null);
+  const[distRight,setDistRight]=useState(null);
+  const[imuAcc,setImuAcc]=useState(null);
+  const[imuGyro,setImuGyro]=useState(null);
+  const[mapMode,setMapMode]=useState('boundary');
+  const[boundary,setBoundary]=useState([]);
+  const[startPt,setStartPt]=useState(null);
+  const[refLatLon,setRefLatLon]=useState(null);
+  const[rows,setRows]=useState([]);
+  const[waypoints,setWaypoints]=useState([]);
+  const[spacing,setSpacing]=useState('2.0');
+  const[robotSpeed,setRobotSpeed]=useState('0.5');
+  const[espIp,setEspIp]=useState('192.168.1.100');
+  const[espPort,setEspPort]=useState('8080');
+  const[simSpeed,setSimSpeed]=useState('Med');
+  const[simRunning,setSimRunning]=useState(false);
+  const[simPaused,setSimPaused]=useState(false);
+  const[simProgress,setSimProgress]=useState(0);
+  const[simTotal,setSimTotal]=useState(0);
+  const[robotPos,setRobotPos]=useState(null);
+  const[donePath,setDonePath]=useState([]);
+  const[telElapsed,setTelElapsed]=useState('—');
+  const[telEta,setTelEta]=useState('—');
+  const[telCovered,setTelCovered]=useState('—');
+  const[telLeft,setTelLeft]=useState('—');
+  const[telNextWp,setTelNextWp]=useState('—');
+  const[statRows,setStatRows]=useState('Rows: 0');
+  const[statWps,setStatWps]=useState('Waypoints: 0');
+  const[statDist,setStatDist]=useState('Total: — m');
+  const[statTime,setStatTime]=useState('Est: —');
+  const[statStart,setStatStart]=useState('Start: Not set');
+
+  const stopRef=useRef(false);
+  const pauseRef=useRef(false);
+  const simStartRef=useRef(null);
+  const gpsWpsRef=useRef([]);
+  const wpDistsRef=useRef([]);
+  const totalMRef=useRef(0);
+  const socketRef=useRef(null);
+  const demoIntervalRef=useRef(null);
+  const simSpeedRef=useRef('Med');
+
+  useEffect(()=>{simSpeedRef.current=simSpeed;},[simSpeed]);
+
+  const addLog=useCallback((msg)=>{
+    const ts=new Date().toTimeString().slice(0,8);
+    setLog(l=>[...l.slice(-100),`[${ts}] ${msg}`]);
+  },[]);
+
+  const startDemoTelemetry=()=>{
+    if(demoIntervalRef.current)return;
+    let t=0;
+    demoIntervalRef.current=setInterval(()=>{
+      t+=0.05;
+      setGpsLat(30.0444+Math.sin(t*0.1)*0.0002);
+      setGpsLon(31.2357+Math.cos(t*0.13)*0.0002);
+      setCompassDeg((t*30)%360);
+      setEnc1Pos((t*50)%360);setEnc1Rpm(120+Math.sin(t)*30);
+      setEnc2Pos((t*45)%360);setEnc2Rpm(115+Math.cos(t)*25);
+      setDistFront(80+Math.sin(t*2)*40);
+      setDistLeft(60+Math.cos(t*1.5)*20);
+      setDistRight(70+Math.sin(t*1.7)*25);
+      setImuAcc({x:Math.sin(t)*9.8,y:Math.cos(t)*2,z:9.8});
+      setImuGyro({x:Math.sin(t*2)*0.5,y:0,z:0});
+    },200);
+  };
+
+  useEffect(()=>()=>{
+    if(demoIntervalRef.current)clearInterval(demoIntervalRef.current);
+  },[]);
+
+  const toggleConnect=()=>{
+    if(connected){
+      if(socketRef.current){try{socketRef.current.close();}catch{}socketRef.current=null;}
+      if(demoIntervalRef.current){clearInterval(demoIntervalRef.current);demoIntervalRef.current=null;}
+      setConnected(false);addLog('Disconnected by user.');
+    }else{
+      addLog(`Connecting to ${ip}:${port}…`);
+      try{
+        const ws=new WebSocket(`ws://${ip}:${port}`);
+        ws.onopen=()=>{socketRef.current=ws;setConnected(true);addLog(`Connected to ${ip}:${port}`);startDemoTelemetry();};
+        ws.onerror=()=>{setConnected(false);addLog('Connection failed — starting demo mode.');setConnected(true);startDemoTelemetry();};
+        ws.onclose=()=>{setConnected(false);addLog('Disconnected.');};
+      }catch{addLog('WS not available — demo mode active.');setConnected(true);startDemoTelemetry();}
+    }
+  };
+
+  const handleMapClick=([lat,lon])=>{
+    if(mapMode==='boundary'){
+      setBoundary(b=>{
+        const nb=[...b,[lat,lon]];
+        if(!refLatLon)setRefLatLon([lat,lon]);
+        return nb;
+      });
+      addLog(`Boundary pt: (${lat.toFixed(5)}, ${lon.toFixed(5)})`);
+    }else{
+      setStartPt([lat,lon]);
+      setStatStart(`Start: (${lat.toFixed(5)}, ${lon.toFixed(5)})`);
+      addLog(`Start set: (${lat.toFixed(5)}, ${lon.toFixed(5)})`);
+    }
+  };
+
+  const setGpsAsStart=()=>{
+    if(gpsLat===null){addLog('No GPS fix.');return;}
+    setStartPt([gpsLat,gpsLon]);
+    setStatStart(`Start: (${gpsLat.toFixed(5)}, ${gpsLon.toFixed(5)})`);
+    addLog(`Start set from GPS: (${gpsLat.toFixed(5)}, ${gpsLon.toFixed(5)})`);
+  };
+
+  const generatePath=()=>{
+    if(boundary.length<3){addLog('Need ≥3 boundary points.');return;}
+    if(!startPt){addLog('Set a start point first.');return;}
+    const sp=parseFloat(spacing);const spd=parseFloat(robotSpeed);
+    if(isNaN(sp)||isNaN(spd)||spd<=0){addLog('Invalid spacing or speed.');return;}
+    const[refLat,refLon]=refLatLon;
+    const localBnd=boundary.map(([la,lo])=>gpsToLocal(la,lo,refLat,refLon));
+    const localStart=gpsToLocal(startPt[0],startPt[1],refLat,refLon);
+    const newRows=generateRows(localBnd,sp);
+    const newWps=planBoustrophedon(newRows,localStart);
+    const gpsWps=newWps.map(wp=>localToGps(wp[0],wp[1],refLat,refLon));
+    const totalM=gpsWps.slice(1).reduce((acc,wp,i)=>acc+haversineM(gpsWps[i],wp),0);
+    const estSec=totalM/spd;
+    const h=Math.floor(estSec/3600),m=Math.floor((estSec%3600)/60),s=Math.floor(estSec%60);
+    setRows(newRows);setWaypoints(newWps);
+    setStatRows(`Rows: ${newRows.length}`);setStatWps(`Waypoints: ${newWps.length}`);
+    setStatDist(`Total: ${totalM.toFixed(1)} m`);
+    setStatTime(`Est: ${h>0?`${h}h `:''}${m}m ${s}s`);
+    addLog(`Generated ${newRows.length} rows, ${newWps.length} waypoints. ${totalM.toFixed(1)} m total.`);
+  };
+
+  const clearBoundary=()=>{setBoundary([]);setRefLatLon(null);addLog('Boundary cleared.');};
+
+  const resetAll=()=>{
+    stopRef.current=true;
+    setBoundary([]);setStartPt(null);setRefLatLon(null);
+    setRows([]);setWaypoints([]);setRobotPos(null);setDonePath([]);
+    setStatRows('Rows: 0');setStatWps('Waypoints: 0');
+    setStatDist('Total: — m');setStatTime('Est: —');setStatStart('Start: Not set');
+    setSimProgress(0);setSimTotal(0);setSimRunning(false);setSimPaused(false);
+    setTelElapsed('—');setTelEta('—');setTelCovered('—');setTelLeft('—');setTelNextWp('—');
+    addLog('All cleared. Ready for new mission.');
+  };
+
+  const SPEED_DELAY={Slow:80,Med:30,Fast:8};
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+
+  const updateTelemetry=(si,total,covered,spd,totalM)=>{
+    const now=Date.now();
+    const elS=(now-simStartRef.current)/1000;
+    const rem=Math.max(0,totalM-covered);
+    const eta=new Date(now+(rem/spd)*1000);
+    const h=Math.floor(elS/3600),m=Math.floor((elS%3600)/60),s=Math.floor(elS%60);
+    setTelElapsed(h>0?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`);
+    setTelEta(eta.toTimeString().slice(0,8));
+    setTelCovered(covered.toFixed(1));setTelLeft(rem.toFixed(1));setTelNextWp(`WP ${si}`);
+  };
+
+  const missionDone=(totalM,spd)=>{
+    const elS=(Date.now()-simStartRef.current)/1000;
+    const h=Math.floor(elS/3600),m=Math.floor((elS%3600)/60),s=Math.floor(elS%60);
+    const elStr=h>0?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    addLog('✅ MISSION COMPLETE');
+    addLog(`   Distance: ${totalM.toFixed(1)} m  Elapsed: ${elStr}`);
+    addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    sendTelegram(`✅ FarmBot Mission Complete!\n📏 ${totalM.toFixed(1)} m\n⏱ ${elStr}`);
+    setSimRunning(false);setSimPaused(false);setTelEta('Done ✓');setTelLeft('0.0');
+  };
+
+  const runSimWorker=async(gpsWps,wpDists,totalM,spd)=>{
+    const total=gpsWps.length-1;
+    for(let si=0;si<total;si++){
+      if(stopRef.current)break;
+      const[p1,p2]=[gpsWps[si],gpsWps[si+1]];
+      const segD=haversineM(p1,p2);
+      const interp=interpolateSeg(p1,p2,INTERP_STEPS);
+      const stepD=segD/INTERP_STEPS;
+      for(let stepI=1;stepI<interp.length;stepI++){
+        while(pauseRef.current&&!stopRef.current)await sleep(100);
+        if(stopRef.current)break;
+        const covered=wpDists[si]+stepD*stepI;
+        const pos=interp[stepI];
+        setRobotPos([pos[0],pos[1]]);
+        setDonePath(d=>[...d,[pos[0],pos[1]]]);
+        setSimProgress(si+stepI/INTERP_STEPS);
+        updateTelemetry(si+1,total,covered,spd,totalM);
+        await sleep(SPEED_DELAY[simSpeedRef.current]||30);
+      }
+    }
+    if(!stopRef.current)missionDone(totalM,spd);
+    else{setSimRunning(false);setSimPaused(false);addLog('⏹ Mission stopped.');}
+  };
+
+  const startSimulation=()=>{
+    if(!waypoints.length||waypoints.length<2){addLog('Generate a path first.');return;}
+    if(simRunning)return;
+    const spd=parseFloat(robotSpeed);
+    if(isNaN(spd)||spd<=0){addLog('Invalid speed.');return;}
+    const[refLat,refLon]=refLatLon;
+    const gpsWps=waypoints.map(wp=>localToGps(wp[0],wp[1],refLat,refLon));
+    const wpDists=[0];
+    for(let i=1;i<gpsWps.length;i++)wpDists.push(wpDists[i-1]+haversineM(gpsWps[i-1],gpsWps[i]));
+    const totalM=wpDists[wpDists.length-1];
+    gpsWpsRef.current=gpsWps;wpDistsRef.current=wpDists;totalMRef.current=totalM;
+    stopRef.current=false;pauseRef.current=false;
+    simStartRef.current=Date.now();
+    setSimRunning(true);setSimPaused(false);
+    setSimTotal(gpsWps.length-1);setSimProgress(0);
+    setDonePath([[gpsWps[0][0],gpsWps[0][1]]]);
+    setRobotPos(gpsWps[0]);
+    addLog(`▶ Simulation started. Speed: ${spd} m/s`);
+    runSimWorker(gpsWps,wpDists,totalM,spd);
+  };
+
+  const pauseMission=()=>{
+    if(!simRunning)return;
+    if(simPaused){pauseRef.current=false;setSimPaused(false);addLog('▶ Mission resumed.');}
+    else{pauseRef.current=true;setSimPaused(true);addLog('⏸ Mission paused.');}
+  };
+
+  const stopMission=()=>{
+    stopRef.current=true;pauseRef.current=false;
+    setSimRunning(false);setSimPaused(false);
+  };
+
+  const distColor=(v)=>v===null?C.dim:v<20?C.err:v<50?C.warn:C.dist;
+
+  const TelemetryTab=()=>React.createElement('div',null,
+    React.createElement(Card,{title:'🔗  ROBOT LINK'},
+      React.createElement('div',{style:{display:'flex',gap:6,marginBottom:6}},
+        React.createElement('input',{value:ip,onChange:e=>setIp(e.target.value),placeholder:'IP',style:{flex:2,background:C.card,border:'1px solid #2a3347',borderRadius:5,padding:'5px 8px',color:C.gps,fontSize:11}}),
+        React.createElement('input',{value:port,onChange:e=>setPort(e.target.value),placeholder:'Port',style:{flex:1,background:C.card,border:'1px solid #2a3347',borderRadius:5,padding:'5px 8px',color:C.gps,fontSize:11}})
+      ),
+      React.createElement(Btn,{label:connected?'🔴  Disconnect':'🟢  Connect',onClick:toggleConnect,color:connected?C.err:C.gps}),
+      React.createElement(Row,{label:'Status',value:connected?'ONLINE':'OFFLINE',valueColor:connected?C.ok:C.err}),
+      React.createElement('div',{style:{fontSize:10,color:C.warn,marginTop:6,padding:'6px 8px',background:'#1a1200',borderRadius:5,border:'1px solid #f39c1233'}},
+        '⚠️ Phone must be on same WiFi as ESP32. Open this file locally — do not use https:// links.'
+      )
+    ),
+    React.createElement(Card,{title:'🛰  GPS LOCATION'},
+      React.createElement(Row,{label:'Latitude',value:gpsLat!==null?gpsLat.toFixed(6):'—',valueColor:C.gps}),
+      React.createElement(Row,{label:'Longitude',value:gpsLon!==null?gpsLon.toFixed(6):'—',valueColor:C.gps}),
+      React.createElement(Btn,{label:'📍 Set as Mission Start',onClick:setGpsAsStart,color:C.gps,disabled:!connected||gpsLat===null})
+    ),
+    React.createElement(Card,{title:'🧭  COMPASS'},
+      React.createElement(Compass,{deg:compassDeg}),
+      React.createElement('div',{style:{textAlign:'center',fontSize:18,fontWeight:700,color:C.compass,marginTop:4}},`${compassDeg.toFixed(1)}°`)
+    ),
+    React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}},
+      React.createElement(Card,{title:'⚙ ENC #1',style:{marginBottom:0}},
+        React.createElement('div',{style:{fontSize:13,fontWeight:700,color:C.enc1,textAlign:'center'}},enc1Pos!==null?enc1Pos.toFixed(1)+'°':'—'),
+        React.createElement('div',{style:{fontSize:10,color:C.dim,textAlign:'center'}},enc1Rpm!==null?enc1Rpm.toFixed(1)+' RPM':'—')
+      ),
+      React.createElement(Card,{title:'⚙ ENC #2',style:{marginBottom:0}},
+        React.createElement('div',{style:{fontSize:13,fontWeight:700,color:C.enc2,textAlign:'center'}},enc2Pos!==null?enc2Pos.toFixed(1)+'°':'—'),
+        React.createElement('div',{style:{fontSize:10,color:C.dim,textAlign:'center'}},enc2Rpm!==null?enc2Rpm.toFixed(1)+' RPM':'—')
+      )
+    ),
+    React.createElement(Card,{title:'📡  COLLISION AVOIDANCE'},
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}},
+        [['FRONT',distFront],['LEFT',distLeft],['RIGHT',distRight]].map(([label,val])=>
+          React.createElement('div',{key:label,style:{background:C.card,borderRadius:6,padding:'8px 4px',textAlign:'center'}},
+            React.createElement('div',{style:{fontSize:9,color:C.dim}},label),
+            React.createElement('div',{style:{fontSize:14,fontWeight:700,color:distColor(val)}},val!==null?val.toFixed(0):'—'),
+            React.createElement('div',{style:{fontSize:9,color:C.dim}},'cm')
+          )
+        )
+      )
+    ),
+    React.createElement(Card,{title:'📐  IMU (MPU6050)'},
+      imuAcc&&React.createElement(Row,{label:'Accel X/Y/Z',value:`${imuAcc.x.toFixed(1)}, ${imuAcc.y.toFixed(1)}, ${imuAcc.z.toFixed(1)}`,valueColor:C.imuA}),
+      imuGyro&&React.createElement(Row,{label:'Gyro X/Y/Z',value:`${imuGyro.x.toFixed(1)}, ${imuGyro.y.toFixed(1)}, ${imuGyro.z.toFixed(1)}`,valueColor:C.imuG}),
+      !imuAcc&&React.createElement('div',{style:{color:C.dim,fontSize:11}},'No data')
+    ),
+    React.createElement(SectionHeader,{label:'LOG'}),
+    React.createElement(LogBox,{entries:log})
+  );
+
+  const MapTab=()=>React.createElement('div',null,
+    React.createElement('div',{style:{display:'flex',gap:6,marginBottom:8}},
+      ['boundary','start'].map(m=>
+        React.createElement('button',{key:m,onClick:()=>setMapMode(m),style:{flex:1,background:mapMode===m?C.accent:C.card,color:mapMode===m?C.bg:C.dim,border:`1px solid ${mapMode===m?C.accent:'#2a3347'}`,borderRadius:7,padding:'8px 0',fontSize:11,fontWeight:700,cursor:'pointer'}},
+          m==='boundary'?'📐 Boundary':'📍 Start Pt'
+        )
+      )
+    ),
+    React.createElement('div',{style:{marginBottom:8}},
+      React.createElement(MapCanvas,{boundary,startPt,rows,waypoints,robotPos,donePath,refLatLon,onMapClick:handleMapClick,mode:mapMode})
+    ),
+    React.createElement('div',{style:{display:'flex',gap:8,marginBottom:8,fontSize:11}},
+      React.createElement('span',{style:{color:C.dim}},'Boundary: ',React.createElement('b',{style:{color:C.accent}},boundary.length,' pts')),
+      React.createElement('span',{style:{color:C.dim}},'WPs: ',React.createElement('b',{style:{color:C.accent}},waypoints.length))
+    ),
+    React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:8}},
+      React.createElement(Btn,{label:'🗑 Clear Boundary',onClick:clearBoundary,color:C.err,style:{marginBottom:0}}),
+      React.createElement(Btn,{label:'🔄 Reset All',onClick:resetAll,color:C.dim,style:{marginBottom:0}})
+    ),
+    React.createElement(SectionHeader,{label:'LOG'}),
+    React.createElement(LogBox,{entries:log})
+  );
+
+  const MissionTab=()=>React.createElement('div',null,
+    React.createElement(Card,{title:'⚙  PARAMETERS'},
+      [['Row Spacing (m)',spacing,setSpacing],['Robot Speed (m/s)',robotSpeed,setRobotSpeed],['ESP32 IP',espIp,setEspIp],['Port',espPort,setEspPort]].map(([label,val,set])=>
+        React.createElement('div',{key:label,style:{display:'flex',alignItems:'center',marginBottom:6,gap:8}},
+          React.createElement('span',{style:{fontSize:11,color:C.dim,flex:1}},label),
+          React.createElement('input',{value:val,onChange:e=>set(e.target.value),style:{background:C.card,border:'1px solid #2a3347',borderRadius:5,padding:'4px 8px',color:C.accent,fontSize:11,width:100}})
+        )
+      )
+    ),
+    React.createElement(Card,{title:'⚡  ACTIONS'},
+      React.createElement(Btn,{label:'⚡  Generate Path',onClick:generatePath,color:C.accent}),
+      React.createElement(Btn,{label:'📡  Send to ESP32',onClick:()=>addLog('Sending to ESP32…'),color:C.warn})
+    ),
+    React.createElement(Card,{title:'▶  SIMULATION'},
+      React.createElement('div',{style:{display:'flex',gap:8,alignItems:'center',marginBottom:8}},
+        React.createElement('span',{style:{fontSize:11,color:C.dim}},'Speed:'),
+        ['Slow','Med','Fast'].map(s=>
+          React.createElement('button',{key:s,onClick:()=>setSimSpeed(s),style:{background:simSpeed===s?C.accent+'33':'transparent',color:simSpeed===s?C.accent:C.dim,border:`1px solid ${simSpeed===s?C.accent:'#2a3347'}`,borderRadius:5,padding:'4px 10px',fontSize:10,cursor:'pointer'}},s)
+        )
+      ),
+      React.createElement(Btn,{label:'▶  Simulate Path',onClick:startSimulation,color:C.accent,disabled:simRunning}),
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}},
+        React.createElement(Btn,{label:simPaused?'▶  Resume':'⏸  Pause',onClick:pauseMission,color:C.warn,disabled:!simRunning,style:{marginBottom:0}}),
+        React.createElement(Btn,{label:'⏹  Stop',onClick:stopMission,color:C.err,disabled:!simRunning,style:{marginBottom:0}})
+      ),
+      React.createElement('div',{style:{fontSize:11,color:C.dim,marginBottom:4}},`Waypoint: ${Math.floor(simProgress)} / ${simTotal}`),
+      React.createElement(ProgressBar,{value:simProgress,max:simTotal})
+    ),
+    React.createElement(Card,{title:'📊  MISSION TELEMETRY'},
+      [['⏱ Elapsed',telElapsed],['🏁 ETA',telEta],['✅ Covered (m)',telCovered],['📏 Remaining (m)',telLeft],['📍 Next WP',telNextWp]].map(([label,val])=>
+        React.createElement(Row,{key:label,label,value:val})
+      )
+    ),
+    React.createElement(Card,{title:'📋  MISSION STATUS'},
+      [statRows,statWps,statDist,statTime,statStart].map((s,i)=>
+        React.createElement('div',{key:i,style:{fontSize:11,color:C.dim,marginBottom:3}},s)
+      )
+    ),
+    React.createElement(SectionHeader,{label:'LOG'}),
+    React.createElement(LogBox,{entries:log})
+  );
+
+  return React.createElement('div',{style:{background:C.bg,minHeight:'100vh',maxWidth:420,margin:'0 auto',display:'flex',flexDirection:'column'}},
+    React.createElement('div',{style:{background:C.panel,padding:'12px 16px',borderBottom:'1px solid #2a3347',display:'flex',alignItems:'center',gap:10,position:'sticky',top:0,zIndex:100}},
+      React.createElement('span',{style:{fontSize:20}},'🌾'),
+      React.createElement('div',null,
+        React.createElement('div',{style:{fontSize:13,fontWeight:700,color:C.accent,letterSpacing:'0.04em'}},'FARMBOT — LOCAL MODE'),
+        React.createElement('div',{style:{fontSize:9,color:C.dim}},'v3.0 — Direct ESP32 Connect')
+      ),
+      React.createElement('div',{style:{marginLeft:'auto',display:'flex',alignItems:'center',gap:6}},
+        React.createElement('div',{style:{width:8,height:8,borderRadius:'50%',background:connected?C.ok:C.err}}),
+        React.createElement('span',{style:{fontSize:10,color:connected?C.ok:C.err}},connected?'ONLINE':'OFFLINE')
+      )
+    ),
+    React.createElement('div',{style:{display:'flex',background:C.panel,borderBottom:'1px solid #2a3347',position:'sticky',top:52,zIndex:99}},
+      TABS.map(({id,icon})=>
+        React.createElement('button',{key:id,onClick:()=>setTab(id),style:{flex:1,padding:'10px 0',background:tab===id?C.card:'transparent',color:tab===id?C.accent:C.dim,border:'none',borderBottom:tab===id?`2px solid ${C.accent}`:'2px solid transparent',fontSize:11,fontWeight:700,cursor:'pointer',textTransform:'uppercase',letterSpacing:'0.05em'}},
+          `${icon} ${id}`
+        )
+      )
+    ),
+    React.createElement('div',{style:{padding:'12px 14px',flex:1,overflowY:'auto'}},
+      tab==='telemetry'&&React.createElement(TelemetryTab),
+      tab==='map'&&React.createElement(MapTab),
+      tab==='mission'&&React.createElement(MissionTab)
+    )
+  );
+}
+
+const root=ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(FarmBotApp));
+
+// ── PWA Install Banner ────────────────────────────────────────────────────────
+(function(){
+  let deferredPrompt = null;
+
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    showBanner();
+  });
+
+  function showBanner(){
+    if(document.getElementById('pwa-banner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'pwa-banner';
+    banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#161b27;border-top:1px solid #4ecdc455;display:flex;align-items:center;gap:10px;padding:10px 16px;font-family:Consolas,monospace;';
+    banner.innerHTML = '<span style="font-size:22px">🌾</span><div style="flex:1"><div style="font-size:12px;font-weight:700;color:#4ecdc4">Add to Home Screen</div><div style="font-size:10px;color:#556070">Install FarmBot for offline access</div></div><button id="pwa-install" style="background:#4ecdc4;color:#0f1219;border:none;border-radius:7px;padding:8px 14px;font-size:11px;font-weight:700;cursor:pointer;font-family:Consolas,monospace">INSTALL</button><button id="pwa-dismiss" style="background:transparent;color:#556070;border:1px solid #2a3347;border-radius:7px;padding:8px 10px;font-size:11px;cursor:pointer;font-family:Consolas,monospace">X</button>';
+    document.body.appendChild(banner);
+    document.getElementById('pwa-install').onclick = async () => {
+      if(!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const {outcome} = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      banner.remove();
+    };
+    document.getElementById('pwa-dismiss').onclick = () => banner.remove();
+  }
+
+  // iOS Safari hint (no beforeinstallprompt support)
+  const isIos = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+  const isStandalone = window.navigator.standalone;
+  if(isIos && !isStandalone){
+    setTimeout(()=>{
+      const hint = document.createElement('div');
+      hint.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#161b27;border-top:1px solid #4ecdc455;padding:10px 16px;font-family:Consolas,monospace;text-align:center;';
+      hint.innerHTML = '<div style="font-size:11px;color:#4ecdc4;font-weight:700;margin-bottom:3px">Install on iPhone/iPad</div><div style="font-size:10px;color:#556070">Tap <b style="color:#c8d6e5">Share</b> then <b style="color:#c8d6e5">Add to Home Screen</b></div><button onclick="this.parentElement.remove()" style="margin-top:6px;background:transparent;color:#556070;border:1px solid #2a3347;border-radius:5px;padding:4px 12px;font-size:10px;cursor:pointer;font-family:Consolas,monospace">OK</button>';
+      document.body.appendChild(hint);
+    }, 2000);
+  }
+})();
+</script>
+</body>
+</html>
