@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="FarmBot"/>
+<meta name="theme-color" content="#0f1219"/>
+<title>FarmBot Command Center</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{background:#0f1219;font-family:Consolas,monospace;overscroll-behavior:none;}
+button,input{font-family:Consolas,monospace;}
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:#0f1219;}
+::-webkit-scrollbar-thumb{background:#2a3347;border-radius:2px;}
+#map-container{width:100%;height:270px;border-radius:10px;overflow:hidden;position:fixed;z-index:50;display:none;pointer-events:auto;}
+.leaflet-container{background:#1a2030!important;}
+.leaflet-control-zoom a{background:#161b27!important;color:#4ecdc4!important;border-color:#2a3347!important;font-family:Consolas,monospace!important;}
+.leaflet-control-layers{background:#161b27!important;color:#c8d6e5!important;border:1px solid #2a3347!important;}
+.leaflet-control-layers label{color:#c8d6e5!important;font-size:11px;}
+
+#lock-screen{
+  position:fixed;inset:0;background:#0f1219;z-index:9999;
+  display:flex;align-items:center;justify-content:center;
+}
+#lock-box{
+  background:#161b27;border:1px solid #2a3347;border-radius:16px;
+  padding:36px 32px;width:320px;max-width:90vw;text-align:center;
+}
+#lock-logo{font-size:48px;margin-bottom:8px;}
+#lock-title{font-size:16px;font-weight:700;color:#4ecdc4;letter-spacing:0.08em;margin-bottom:4px;}
+#lock-sub{font-size:11px;color:#556070;margin-bottom:28px;}
+#lock-input-wrap{position:relative;margin-bottom:12px;}
+#lock-input{
+  width:100%;background:#1e2535;border:1px solid #2a3347;border-radius:8px;
+  padding:12px 44px 12px 14px;color:#00ffcc;font-size:15px;font-family:Consolas,monospace;
+  outline:none;letter-spacing:0.12em;
+}
+#lock-input:focus{border-color:#4ecdc4;}
+#lock-eye{
+  position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:#556070;cursor:pointer;font-size:16px;padding:0;
+}
+#lock-btn{
+  width:100%;background:#4ecdc4;color:#0f1219;border:none;border-radius:8px;
+  padding:12px;font-size:14px;font-weight:700;font-family:Consolas,monospace;
+  cursor:pointer;letter-spacing:0.05em;margin-bottom:10px;
+  transition:background 0.15s;
+}
+#lock-btn:hover{background:#3ab8b0;}
+#lock-error{
+  font-size:11px;color:#e74c3c;min-height:16px;transition:opacity 0.2s;
+}
+#lock-attempts{font-size:10px;color:#556070;margin-top:6px;}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.shake{animation:shake 0.4s ease;}
+</style>
+</head>
+<body>
+
+<div id="lock-screen">
+  <div id="lock-box">
+    <div id="lock-logo">🌾</div>
+    <div id="lock-title">FARMBOT COMMAND CENTER</div>
+    <div id="lock-sub">Enter password to continue</div>
+    <div id="lock-input-wrap">
+      <input id="lock-input" type="password" placeholder="••••••••" autocomplete="off" />
+      <button id="lock-eye" onclick="toggleEye()">👁</button>
+    </div>
+    <button id="lock-btn" onclick="tryUnlock()">UNLOCK</button>
+    <div id="lock-error"></div>
+    <div id="lock-attempts"></div>
+  </div>
+</div>
+<div id="app"></div>
+<!-- map lives OUTSIDE React so it never gets unmounted -->
+<div id="map-container" style="display:none;"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+// ── CONSTANTS ────────────────────────────────────────────────────────────────
+const TELEGRAM_TOKEN  = "8814940820:AAHSOHcjyKpGnqh-LYp2lLC-zY_vyO5sp9Q";
+const TELEGRAM_CHAT_ID= "903665860";
+const ROBOT_DEFAULT_IP  = "10.237.194.94";
+const ROBOT_DEFAULT_PORT= 8888;
+const INTERP_STEPS = 20;
+const C={
+  bg:"#0f1219",panel:"#161b27",card:"#1e2535",accent:"#4ecdc4",
+  gps:"#00ffcc",warn:"#f39c12",err:"#e74c3c",ok:"#2ecc71",
+  txt:"#c8d6e5",dim:"#556070",white:"#ffffff",
+  enc1:"#00bfff",enc2:"#ffaa44",imuA:"#7fff7f",imuG:"#ffaa00",
+  compass:"#ff5722",dist:"#ffcc00",
+};
+
+// ── GEOMETRY ─────────────────────────────────────────────────────────────────
+function gpsToLocal(lat,lon,rLat,rLon){
+  const y=(lat-rLat)*111320;
+  const x=(lon-rLon)*(111320*Math.cos(rLat*Math.PI/180));
+  return[x,y];
+}
+function localToGps(x,y,rLat,rLon){
+  return[rLat+y/111320, rLon+x/(111320*Math.cos(rLat*Math.PI/180))];
+}
+function haversineM([la1,lo1],[la2,lo2]){
+  const R=6371000,dLat=(la2-la1)*Math.PI/180,dLon=(lo2-lo1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function dist2d([x1,y1],[x2,y2]){return Math.sqrt((x1-x2)**2+(y1-y2)**2);}
+function isInPolygon([px,py],poly){
+  let inside=false,n=poly.length,[p1x,p1y]=poly[0];
+  for(let i=1;i<=n;i++){
+    const[p2x,p2y]=poly[i%n];
+    if(py>Math.min(p1y,p2y)&&py<=Math.max(p1y,p2y)&&px<=Math.max(p1x,p2x)){
+      if(p1y!==p2y){const xi=((py-p1y)*(p2x-p1x))/(p2y-p1y)+p1x;if(p1x===p2x||px<=xi)inside=!inside;}
+    }
+    [p1x,p1y]=[p2x,p2y];
+  }
+  return inside;
+}
+function lineIntersect([a,b],[c,d]){
+  const dx1=a[0]-b[0],dy1=a[1]-b[1],dx2=c[0]-d[0],dy2=c[1]-d[1];
+  const den=dx1*dy2-dy1*dx2;if(!den)return null;
+  const det1=a[0]*b[1]-a[1]*b[0],det2=c[0]*d[1]-c[1]*d[0];
+  const x=(det1*dx2-dx1*det2)/den,y=(det1*dy2-dy1*det2)/den;
+  const inSeg=(s,px,py)=>Math.min(s[0][0],s[1][0])-1e-6<=px&&px<=Math.max(s[0][0],s[1][0])+1e-6&&Math.min(s[0][1],s[1][1])-1e-6<=py&&py<=Math.max(s[0][1],s[1][1])+1e-6;
+  return inSeg([a,b],x,y)&&inSeg([c,d],x,y)?[x,y]:null;
+}
+function generateRows(polygon,spacing=2){
+  const rows=[],xs=polygon.map(p=>p[0]),ys=polygon.map(p=>p[1]);
+  const[minX,maxX,minY,maxY]=[Math.min(...xs),Math.max(...xs),Math.min(...ys),Math.max(...ys)];
+  for(let x=minX+spacing/2;x<maxX;x+=spacing){
+    const vl=[[x,minY-10],[x,maxY+10]];let its=[];
+    for(let i=0;i<polygon.length;i++){
+      const pt=lineIntersect(vl,[polygon[i],polygon[(i+1)%polygon.length]]);
+      if(pt&&!its.some(u=>Math.abs(u[0]-pt[0])<1e-5&&Math.abs(u[1]-pt[1])<1e-5))its.push(pt);
+    }
+    its.sort((a,b)=>a[1]-b[1]);
+    for(let i=0;i<its.length-1;i+=2){
+      const s=[+its[i][0].toFixed(6),+its[i][1].toFixed(6)];
+      const e=[+its[i+1][0].toFixed(6),+its[i+1][1].toFixed(6)];
+      if(isInPolygon([(s[0]+e[0])/2,(s[1]+e[1])/2],polygon))rows.push([s,e]);
+    }
+  }
+  return rows;
+}
+function planBoustrophedon(rows,start){
+  if(!rows.length)return[];
+  let bestD=Infinity,firstIdx=0,startAtEnd=false;
+  rows.forEach(([r1,r2],i)=>[r1,r2].forEach((pt,j)=>{const d=dist2d(start,pt);if(d<bestD){bestD=d;firstIdx=i;startAtEnd=j===1;}}));
+  const wps=[];let goEnd=startAtEnd;
+  const addRow=row=>{let[p1,p2]=row;if(p1[1]>p2[1])[p1,p2]=[p2,p1];wps.push(...(goEnd?[p2,p1]:[p1,p2]));goEnd=!goEnd;};
+  for(let i=firstIdx;i<rows.length;i++)addRow(rows[i]);
+  for(let i=firstIdx-1;i>=0;i--)addRow(rows[i]);
+  return[start,...wps];
+}
+function interpSeg(p1,p2,steps=INTERP_STEPS){
+  return Array.from({length:steps+1},(_,i)=>[p1[0]+i/steps*(p2[0]-p1[0]),p1[1]+i/steps*(p2[1]-p1[1])]);
+}
+async function sendTelegram(msg){
+  try{await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({chat_id:TELEGRAM_CHAT_ID,text:msg})});}catch{}
+}
+
+// ── LEAFLET MAP MANAGER (lives outside React) ─────────────────────────────────
+const MapMgr = (function(){
+  let map=null,mode='boundary',onClickCb=null;
+  const layers={bndPoly:null,bndPts:[],rowLines:[],wpPath:null,doneLine:null,startMark:null,robotMark:null,customPts:[]};
+
+  function init(){
+    if(map)return;
+    const el=document.getElementById('map-container');
+    map=L.map(el,{center:[30.0444,31.2357],zoom:18,preferCanvas:true});
+    const street=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:22,attribution:'© OSM',crossOrigin:true});
+    const sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:22,attribution:'© Esri',crossOrigin:true});
+    const hybrid=L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',{maxZoom:22,attribution:'© Google',crossOrigin:true});
+    street.addTo(map);
+    L.control.layers({'🛣 Street':street,'🛰 Satellite (Esri)':sat,'🌍 Hybrid (Google)':hybrid},{},{position:'topright'}).addTo(map);
+    // Fallback: if tiles fail to load, try street
+    sat.on('tileerror',()=>{ if(!map._streetAdded){street.addTo(map);map._streetAdded=true;} });
+    map.on('click',e=>{if(onClickCb)onClickCb([e.latlng.lat,e.latlng.lng]);});
+  }
+
+  function setOnClick(cb){onClickCb=cb;}
+  function setMode(m){mode=m;if(map)map.getContainer().style.cursor=m==='boundary'?'crosshair':'pointer';}
+
+  function invalidate(){if(map)setTimeout(()=>map.invalidateSize(),50);}
+
+  function setBoundary(gpsPoints){
+    layers.bndPts.forEach(m=>map.removeLayer(m));layers.bndPts=[];
+    if(layers.bndPoly){map.removeLayer(layers.bndPoly);layers.bndPoly=null;}
+    gpsPoints.forEach(([lat,lon],i)=>{
+      const m=L.circleMarker([lat,lon],{radius:5,color:C.accent,fillColor:C.accent,fillOpacity:1}).addTo(map);
+      layers.bndPts.push(m);
+      if(i===0&&!map._farmCentered)map.setView([lat,lon],19);
+    });
+    if(gpsPoints.length>=3){
+      layers.bndPoly=L.polygon(gpsPoints,{color:C.accent,weight:2,fillOpacity:0.1}).addTo(map);
+      map._farmCentered=true;
+    }
+  }
+
+  function setRows(rows,refLatLon){
+    layers.rowLines.forEach(l=>map.removeLayer(l));layers.rowLines=[];
+    if(!rows.length||!refLatLon)return;
+    const[rl,rn]=refLatLon;
+    rows.forEach(([a,b])=>{
+      const l=L.polyline([localToGps(a[0],a[1],rl,rn),localToGps(b[0],b[1],rl,rn)],{color:C.ok,weight:1.5}).addTo(map);
+      layers.rowLines.push(l);
+    });
+  }
+
+  function setWaypoints(wps,refLatLon){
+    if(layers.wpPath){map.removeLayer(layers.wpPath);layers.wpPath=null;}
+    if(wps.length<2||!refLatLon)return;
+    const[rl,rn]=refLatLon;
+    layers.wpPath=L.polyline(wps.map(w=>localToGps(w[0],w[1],rl,rn)),{color:C.warn,weight:1.5,dashArray:'5,4'}).addTo(map);
+  }
+
+  function setDonePath(coords){
+    if(layers.doneLine){map.removeLayer(layers.doneLine);layers.doneLine=null;}
+    if(coords.length>=2)layers.doneLine=L.polyline(coords,{color:'#fff',weight:2.5}).addTo(map);
+  }
+
+  function setStartPoint(latlon){
+    if(layers.startMark){map.removeLayer(layers.startMark);layers.startMark=null;}
+    if(!latlon)return;
+    layers.startMark=L.circleMarker(latlon,{radius:9,color:C.warn,fillColor:C.warn,fillOpacity:0.8}).bindTooltip('S',{permanent:true,direction:'center',className:''}).addTo(map);
+  }
+
+  function setRobot(latlon){
+    if(layers.robotMark){map.removeLayer(layers.robotMark);layers.robotMark=null;}
+    if(!latlon)return;
+    layers.robotMark=L.circleMarker(latlon,{radius:11,color:C.gps,fillColor:C.gps,fillOpacity:0.85}).bindTooltip('🚜',{permanent:true,direction:'center'}).addTo(map);
+    map.panTo(latlon,{animate:true,duration:0.3});
+  }
+
+  function clearAll(){
+    setBoundary([]);setRows([],null);setWaypoints([],null);setDonePath([]);setStartPoint(null);setRobot(null);
+    clearCustomPoints();
+    map._farmCentered=false;
+  }
+
+  function addCustomPoint(latlon,label){
+    const m=L.marker(latlon,{
+      icon:L.divIcon({
+        className:'',
+        html:`<div style="background:${C.warn};color:#000;font-weight:700;font-size:10px;padding:2px 5px;border-radius:4px;border:1px solid #000;white-space:nowrap;box-shadow:0 1px 3px #0008;">${label}</div>`,
+        iconAnchor:[0,10]
+      })
+    }).addTo(map);
+    m.bindPopup(`<b>${label}</b><br>Lat: ${latlon[0].toFixed(6)}<br>Lon: ${latlon[1].toFixed(6)}`);
+    layers.customPts.push(m);
+    return layers.customPts.length;
+  }
+
+  function clearCustomPoints(){
+    layers.customPts.forEach(m=>map.removeLayer(m));
+    layers.customPts=[];
+  }
+
+  return{init,setOnClick,setMode,invalidate,setBoundary,setRows,setWaypoints,setDonePath,setStartPoint,setRobot,clearAll,addCustomPoint,clearCustomPoints};
+})();
+
+// ── APP STATE (global, drives UI) ─────────────────────────────────────────────
+const S={
+  tab:'telemetry',mapMode:'boundary',
+  connected:false,ip:ROBOT_DEFAULT_IP,port:String(ROBOT_DEFAULT_PORT),
+  gpsLat:null,gpsLon:null,compassDeg:0,
+  enc1Pos:null,enc1Rpm:null,enc2Pos:null,enc2Rpm:null,
+  distFront:null,distLeft:null,distRight:null,
+  imuAcc:null,imuGyro:null,
+  boundary:[],startPt:null,refLatLon:null,
+  rows:[],waypoints:[],robotPos:null,donePath:[],
+  customPoints:[],
+  spacing:'2',robotSpeed:'0.5',espIp:'192.168.1.100',espPort:'8080',
+  simRunning:false,simPaused:false,simProgress:0,simTotal:0,simSpeed:'Med',
+  telElapsed:'—',telEta:'—',telCovered:'—',telLeft:'—',telNextWp:'—',
+  statRows:'Rows: 0',statWps:'Waypoints: 0',statDist:'Total: — m',statTime:'Est: —',statStart:'Start: Not set',
+  log:['[system] FarmBot Command Center v4.0 ready.'],
+};
+let _listeners=[];
+function subscribe(fn){_listeners.push(fn);return()=>{_listeners=_listeners.filter(f=>f!==fn);};}
+function update(patch){Object.assign(S,patch);_listeners.forEach(f=>f());}
+function addLog(msg){const ts=new Date().toTimeString().slice(0,8);update({log:[...S.log,`[${ts}] ${msg}`].slice(-200)});}
+
+// ── FAST TELEMETRY PATCH — updates mission labels directly, no full re-render ──
+function patchTel(elapsed,eta,covered,left,nextWp,progress,total){
+  S.telElapsed=elapsed;S.telEta=eta;S.telCovered=covered;S.telLeft=left;S.telNextWp=nextWp;
+  S.simProgress=progress;
+  const q=id=>document.getElementById(id);
+  const set=(id,v)=>{const el=q(id);if(el)el.textContent=v;};
+  set('tel-elapsed',elapsed);set('tel-eta',eta);set('tel-covered',covered);
+  set('tel-left',left);set('tel-nextwp',nextWp);
+  const pct=total>0?Math.min(100,(progress/total)*100):0;
+  const bar=q('sim-progress-bar');if(bar)bar.style.width=pct+'%';
+  const wpl=q('sim-wp-label');if(wpl)wpl.textContent=`Waypoint: ${Math.floor(progress)} / ${total}`;
+}
+
+// ── WEBSOCKET ─────────────────────────────────────────────────────────────────
+let ws=null,demoTimer=null;
+function toggleConnect(){
+  if(S.connected){
+    if(ws){try{ws.close();}catch{}ws=null;}
+    if(demoTimer){clearInterval(demoTimer);demoTimer=null;}
+    update({connected:false});addLog('Disconnected.');return;
+  }
+  addLog(`Connecting to ${S.ip}:${S.port}…`);
+  const startDemo=()=>{
+    update({connected:true});addLog('Demo mode active — simulated telemetry.');
+    let t=0;
+    demoTimer=setInterval(()=>{
+      t+=0.05;
+      update({
+        gpsLat:30.0444+Math.sin(t*0.1)*0.0002,gpsLon:31.2357+Math.cos(t*0.13)*0.0002,
+        compassDeg:(t*30)%360,
+        enc1Pos:(t*50)%360,enc1Rpm:120+Math.sin(t)*30,
+        enc2Pos:(t*45)%360,enc2Rpm:115+Math.cos(t)*25,
+        distFront:80+Math.sin(t*2)*40,distLeft:60+Math.cos(t*1.5)*20,distRight:70+Math.sin(t*1.7)*25,
+        imuAcc:{x:Math.sin(t)*9.8,y:Math.cos(t)*2,z:9.8},
+        imuGyro:{x:Math.sin(t*2)*0.5,y:0,z:0},
+      });
+    },200);
+  };
+  try{
+    ws=new WebSocket(`ws://${S.ip}:${S.port}`);
+    ws.onopen=()=>{addLog(`Connected to ${S.ip}:${S.port}`);startDemo();};
+    ws.onerror=()=>{addLog('WS failed — demo mode.');startDemo();};
+    ws.onmessage=e=>{try{const d=JSON.parse(e.data);
+      if(d.lat!==undefined)update({gpsLat:d.lat,gpsLon:d.lon});
+      if(d.compass!==undefined)update({compassDeg:d.compass});
+    }catch{}};
+    ws.onclose=()=>{if(S.connected){update({connected:false});addLog('Disconnected.');}};
+  }catch{addLog('WS not available — demo mode.');startDemo();}
+}
+
+// ── MAP CLICK HANDLER ─────────────────────────────────────────────────────────
+MapMgr.setOnClick(([lat,lon])=>{
+  if(S.mapMode==='boundary'){
+    const nb=[...S.boundary,[lat,lon]];
+    const ref=S.refLatLon||[lat,lon];
+    update({boundary:nb,refLatLon:ref});
+    MapMgr.setBoundary(nb);
+    addLog(`Boundary pt ${nb.length}: (${lat.toFixed(5)}, ${lon.toFixed(5)})`);
+  }else if(S.mapMode==='point'){
+    const label=`P${S.customPoints.length+1}`;
+    const np=[...S.customPoints,{lat,lon,label}];
+    update({customPoints:np});
+    MapMgr.addCustomPoint([lat,lon],label);
+    addLog(`Point ${label}: (${lat.toFixed(5)}, ${lon.toFixed(5)})`);
+  }else{
+    update({startPt:[lat,lon],statStart:`Start: (${lat.toFixed(5)}, ${lon.toFixed(5)})`});
+    MapMgr.setStartPoint([lat,lon]);
+    addLog(`Start set: (${lat.toFixed(5)}, ${lon.toFixed(5)})`);
+  }
+});
+
+// ── PATH GENERATION ───────────────────────────────────────────────────────────
+function generatePath(){
+  if(S.boundary.length<3){addLog('Need ≥3 boundary points.');return;}
+  if(!S.startPt){addLog('Set a start point first.');return;}
+  const sp=parseFloat(S.spacing),spd=parseFloat(S.robotSpeed);
+  if(isNaN(sp)||isNaN(spd)||spd<=0){addLog('Invalid spacing or speed.');return;}
+  const[rl,rn]=S.refLatLon;
+  const localBnd=S.boundary.map(([la,lo])=>gpsToLocal(la,lo,rl,rn));
+  const localStart=gpsToLocal(S.startPt[0],S.startPt[1],rl,rn);
+  const rows=generateRows(localBnd,sp);
+  const wps=planBoustrophedon(rows,localStart);
+  const gpsWps=wps.map(w=>localToGps(w[0],w[1],rl,rn));
+  const totalM=gpsWps.slice(1).reduce((acc,wp,i)=>acc+haversineM(gpsWps[i],wp),0);
+  const estSec=totalM/spd;
+  const h=Math.floor(estSec/3600),m=Math.floor((estSec%3600)/60),sec=Math.floor(estSec%60);
+  update({rows,waypoints:wps,
+    statRows:`Rows: ${rows.length}`,statWps:`Waypoints: ${wps.length}`,
+    statDist:`Total: ${totalM.toFixed(1)} m`,
+    statTime:`Est: ${h>0?h+'h ':''}${m}m ${sec}s`});
+  MapMgr.setRows(rows,S.refLatLon);
+  MapMgr.setWaypoints(wps,S.refLatLon);
+  addLog(`Generated ${rows.length} rows, ${wps.length} waypoints. ${totalM.toFixed(1)} m`);
+}
+
+// ── SIMULATION ────────────────────────────────────────────────────────────────
+let stopSim=false,pauseSim=false,simStartTime=0;
+const SPEED_DELAY={Slow:80,Med:30,Fast:8};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+async function startSimulation(){
+  if(!S.waypoints.length||S.waypoints.length<2){addLog('Generate a path first.');return;}
+  if(S.simRunning)return;
+  const spd=parseFloat(S.robotSpeed);
+  if(isNaN(spd)||spd<=0){addLog('Invalid speed.');return;}
+  const[rl,rn]=S.refLatLon;
+  const gpsWps=S.waypoints.map(w=>localToGps(w[0],w[1],rl,rn));
+  const wpDists=[0];
+  for(let i=1;i<gpsWps.length;i++)wpDists.push(wpDists[i-1]+haversineM(gpsWps[i-1],gpsWps[i]));
+  const totalM=wpDists[wpDists.length-1];
+  stopSim=false;pauseSim=false;simStartTime=Date.now();
+  update({simRunning:true,simPaused:false,simTotal:gpsWps.length-1,simProgress:0,donePath:[gpsWps[0]],robotPos:gpsWps[0]});
+  MapMgr.setDonePath([gpsWps[0]]);MapMgr.setRobot(gpsWps[0]);
+  addLog(`▶ Simulation started. Speed: ${spd} m/s`);
+  await sleep(50); // let renderApp run once so IDs exist in DOM
+
+  const total=gpsWps.length-1;
+  const liveCoords=[gpsWps[0]];  // local array — never stored in S during sim
+  for(let si=0;si<total;si++){
+    if(stopSim)break;
+    const[p1,p2]=[gpsWps[si],gpsWps[si+1]];
+    const segD=haversineM(p1,p2);
+    const interp=interpSeg(p1,p2,INTERP_STEPS);
+    const stepD=segD/INTERP_STEPS;
+    for(let step=1;step<interp.length;step++){
+      while(pauseSim&&!stopSim)await sleep(100);
+      if(stopSim)break;
+      const covered=wpDists[si]+stepD*step;
+      const pos=interp[step];
+      const now=Date.now();
+      const elS=(now-simStartTime)/1000;
+      const rem=Math.max(0,totalM-covered);
+      const eta=new Date(now+rem/spd*1000);
+      const eh=Math.floor(elS/3600),em=Math.floor((elS%3600)/60),es=Math.floor(elS%60);
+      const elStr=eh>0?`${eh}:${String(em).padStart(2,'0')}:${String(es).padStart(2,'0')}`:`${String(em).padStart(2,'0')}:${String(es).padStart(2,'0')}`;
+      liveCoords.push(pos);
+      // Direct DOM patch — NO full re-render
+      patchTel(elStr,eta.toTimeString().slice(0,8),covered.toFixed(1),rem.toFixed(1),`WP ${si+1}`,si+step/INTERP_STEPS,total);
+      MapMgr.setRobot(pos);
+      MapMgr.setDonePath(liveCoords);
+      await sleep(SPEED_DELAY[S.simSpeed]||30);
+    }
+  }
+  S.donePath=liveCoords;
+  if(!stopSim){
+    const elS=(Date.now()-simStartTime)/1000;
+    const eh=Math.floor(elS/3600),em=Math.floor((elS%3600)/60),es=Math.floor(elS%60);
+    const elStr=eh>0?`${eh}:${String(em).padStart(2,'0')}:${String(es).padStart(2,'0')}`:`${String(em).padStart(2,'0')}:${String(es).padStart(2,'0')}`;
+    addLog('✅ MISSION COMPLETE — Distance: '+totalM.toFixed(1)+' m  Time: '+elStr);
+    sendTelegram(`✅ FarmBot Mission Complete!\n📏 ${totalM.toFixed(1)} m\n⏱ ${elStr}`);
+    update({telEta:'Done ✓',telLeft:'0.0'});
+  }else{addLog('⏹ Mission stopped.');}
+  update({simRunning:false,simPaused:false});
+}
+
+function pauseMission(){
+  if(!S.simRunning)return;
+  pauseSim=!pauseSim;
+  update({simPaused:pauseSim});
+  addLog(pauseSim?'⏸ Paused.':'▶ Resumed.');
+}
+function stopMission(){stopSim=true;pauseSim=false;update({simRunning:false,simPaused:false});addLog('⏹ Stopped.');}
+function clearBoundary(){update({boundary:[],refLatLon:null});MapMgr.setBoundary([]);addLog('Boundary cleared.');}
+function resetAll(){
+  stopSim=true;
+  update({boundary:[],startPt:null,refLatLon:null,rows:[],waypoints:[],robotPos:null,donePath:[],
+    customPoints:[],
+    statRows:'Rows: 0',statWps:'Waypoints: 0',statDist:'Total: — m',statTime:'Est: —',statStart:'Start: Not set',
+    simProgress:0,simTotal:0,simRunning:false,simPaused:false,
+    telElapsed:'—',telEta:'—',telCovered:'—',telLeft:'—',telNextWp:'—'});
+  MapMgr.clearAll();addLog('All cleared. Ready for new mission.');
+}
+function setGpsAsStart(){
+  if(S.gpsLat===null){addLog('No GPS fix.');return;}
+  const lat=S.gpsLat,lon=S.gpsLon;
+  update({startPt:[lat,lon],statStart:`Start: (${lat.toFixed(5)}, ${lon.toFixed(5)})`});
+  MapMgr.setStartPoint([lat,lon]);
+  addLog(`Start set from GPS: (${lat.toFixed(5)}, ${lon.toFixed(5)})`);
+}
+
+// ── VANILLA JS UI RENDERER ────────────────────────────────────────────────────
+function h(tag,props,...children){
+  const el=document.createElement(tag);
+  if(props)Object.entries(props).forEach(([k,v])=>{
+    if(k==='style'&&typeof v==='object')Object.assign(el.style,v);
+    else if(k.startsWith('on'))el.addEventListener(k.slice(2).toLowerCase(),v);
+    else el.setAttribute(k,v);
+  });
+  children.flat().forEach(c=>{if(c==null)return;el.appendChild(typeof c==='string'?document.createTextNode(c):c);});
+  return el;
+}
+
+function renderApp(){
+  // Always hide the fixed map overlay unless we are on the map tab
+  const _mc=document.getElementById('map-container');
+  if(_mc && S.tab!=='map') _mc.style.display='none';
+
+  const root=document.getElementById('app');
+  root.innerHTML='';
+
+  const distColor=v=>v===null?C.dim:v<20?C.err:v<50?C.warn:C.dist;
+  const btn=(label,onClick,color,disabled=false,style={})=>{
+    const el=h('button',{
+      style:{background:disabled?'#1a2030':C.card,color:disabled?C.dim:color,
+        border:`1px solid ${disabled?'#2a3347':color+'55'}`,
+        borderRadius:7,padding:'9px 10px',fontSize:12,fontWeight:700,
+        cursor:disabled?'not-allowed':'pointer',
+        width:'100%',textAlign:'left',marginBottom:6,
+        opacity:disabled?0.4:1,
+        pointerEvents:disabled?'none':'auto',
+        WebkitUserSelect:'none',userSelect:'none',...style}
+    },label);
+    if(!disabled) el.addEventListener('click',onClick);
+    if(disabled) el.setAttribute('disabled','');
+    return el;
+  };
+  const row=(label,value,valueColor=C.accent)=>h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}},
+    h('span',{style:{fontSize:11,color:C.dim}},label),
+    h('span',{style:{fontSize:11,color:valueColor,fontWeight:700}},value)
+  );
+  const card=(title,titleColor,...children)=>{
+    const c=h('div',{style:{background:C.panel,border:'1px solid #2a3347',borderRadius:10,marginBottom:10,overflow:'hidden'}});
+    if(title)c.appendChild(h('div',{style:{padding:'6px 12px',borderBottom:'1px solid #2a3347',fontSize:11,fontWeight:700,color:titleColor,letterSpacing:'0.05em'}},title));
+    const body=h('div',{style:{padding:'8px 12px'}});
+    children.flat().filter(Boolean).forEach(ch=>body.appendChild(ch));
+    c.appendChild(body);return c;
+  };
+
+  // ── Header ──
+  const statusColor=S.connected?C.ok:C.err;
+  const header=h('div',{style:{background:C.panel,padding:'12px 16px',borderBottom:'1px solid #2a3347',display:'flex',alignItems:'center',gap:10,position:'sticky',top:0,zIndex:200}},
+    h('span',{style:{fontSize:20}},'🌾'),
+    h('div',null,
+      h('div',{style:{fontSize:13,fontWeight:700,color:C.accent,letterSpacing:'0.04em'}},'FARMBOT COMMAND CENTER'),
+      h('div',{style:{fontSize:9,color:C.dim}},'v4.0 — Mobile + Satellite Map')
+    ),
+    h('div',{style:{marginLeft:'auto',display:'flex',alignItems:'center',gap:6}},
+      h('div',{style:{width:8,height:8,borderRadius:'50%',background:statusColor}}),
+      h('span',{style:{fontSize:10,color:statusColor}},S.connected?'ONLINE':'OFFLINE')
+    )
+  );
+
+  // ── Tabs ──
+  const TABS=[{id:'telemetry',icon:'📡'},{id:'map',icon:'🗺'},{id:'mission',icon:'⚙'}];
+  const tabBar=h('div',{style:{display:'flex',background:C.panel,borderBottom:'1px solid #2a3347',position:'sticky',top:52,zIndex:199}},
+    ...TABS.map(t=>h('button',{onClick:()=>{if(t.id!=='map'){const mc=document.getElementById('map-container');if(mc)mc.style.display='none';}update({tab:t.id});},
+      style:{flex:1,padding:'10px 0',background:S.tab===t.id?C.card:'transparent',color:S.tab===t.id?C.accent:C.dim,
+      border:'none',borderBottom:S.tab===t.id?`2px solid ${C.accent}`:'2px solid transparent',
+      fontSize:11,fontWeight:700,cursor:'pointer',textTransform:'uppercase',letterSpacing:'0.05em'}},
+      `${t.icon} ${t.id}`))
+  );
+
+  // ── Log box ──
+  const logDiv=h('div',{style:{background:'#080c10',borderRadius:7,padding:'6px 8px',height:100,overflowY:'auto',fontSize:10,color:C.accent}});
+  S.log.forEach(e=>logDiv.appendChild(h('div',null,e)));
+  setTimeout(()=>logDiv.scrollTop=logDiv.scrollHeight,0);
+
+  // ── Compass ──
+  const compass=h('svg',{width:'90',height:'90',style:{display:'block',margin:'0 auto'}});
+  const r=38,cx=45,cy=45;
+  const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  circle.setAttribute('cx',cx);circle.setAttribute('cy',cy);circle.setAttribute('r',r);
+  circle.setAttribute('fill','none');circle.setAttribute('stroke',C.dim);circle.setAttribute('stroke-width','1');
+  compass.appendChild(circle);
+  [['N',0],['E',90],['S',180],['W',270]].forEach(([l,a])=>{
+    const ar=(a-90)*Math.PI/180;
+    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',cx+(r+8)*Math.cos(ar));t.setAttribute('y',cy+(r+8)*Math.sin(ar));
+    t.setAttribute('fill',C.dim);t.setAttribute('font-size','8');t.setAttribute('text-anchor','middle');t.setAttribute('dominant-baseline','middle');
+    t.textContent=l;compass.appendChild(t);
+  });
+  const rad=(S.compassDeg-90)*Math.PI/180;
+  const nx=cx+(r-8)*Math.cos(rad),ny=cy+(r-8)*Math.sin(rad);
+  const bx=cx-12*Math.cos(rad),by=cy-12*Math.sin(rad);
+  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
+  const marker=document.createElementNS('http://www.w3.org/2000/svg','marker');
+  marker.setAttribute('id','arr');marker.setAttribute('markerWidth','6');marker.setAttribute('markerHeight','6');
+  marker.setAttribute('refX','3');marker.setAttribute('refY','3');marker.setAttribute('orient','auto');
+  const mp=document.createElementNS('http://www.w3.org/2000/svg','path');
+  mp.setAttribute('d','M0,0 L6,3 L0,6 Z');mp.setAttribute('fill',C.compass);
+  marker.appendChild(mp);defs.appendChild(marker);compass.appendChild(defs);
+  const ln1=document.createElementNS('http://www.w3.org/2000/svg','line');
+  ln1.setAttribute('x1',cx);ln1.setAttribute('y1',cy);ln1.setAttribute('x2',nx);ln1.setAttribute('y2',ny);
+  ln1.setAttribute('stroke',C.compass);ln1.setAttribute('stroke-width','3');ln1.setAttribute('marker-end','url(#arr)');
+  compass.appendChild(ln1);
+  const ln2=document.createElementNS('http://www.w3.org/2000/svg','line');
+  ln2.setAttribute('x1',cx);ln2.setAttribute('y1',cy);ln2.setAttribute('x2',bx);ln2.setAttribute('y2',by);
+  ln2.setAttribute('stroke',C.dim);ln2.setAttribute('stroke-width','2');compass.appendChild(ln2);
+
+  // ── Tab content ──
+  let tabContent;
+
+  if(S.tab==='telemetry'){
+    // input style
+    const inp=style=>Object.assign({background:C.card,border:'1px solid #2a3347',borderRadius:5,padding:'5px 8px',color:C.gps,fontSize:11},style);
+    const ipRow=h('div',{style:{display:'flex',gap:6,marginBottom:6}},
+      h('input',{value:S.ip,style:inp({flex:2}),onInput:e=>S.ip=e.target.value,placeholder:'IP'}),
+      h('input',{value:S.port,style:inp({flex:1}),onInput:e=>S.port=e.target.value,placeholder:'Port'})
+    );
+    const connBtn=btn(S.connected?'🔴  Disconnect':'🟢  Connect',toggleConnect,S.connected?C.err:C.gps);
+
+    tabContent=h('div',null,
+      card('🔗  ROBOT LINK',C.accent,ipRow,connBtn,row('Status',S.connected?'ONLINE':'OFFLINE',S.connected?C.ok:C.err)),
+      card('🛰  GPS LOCATION',C.accent,
+        row('Latitude',S.gpsLat!==null?S.gpsLat.toFixed(6):'—',C.gps),
+        row('Longitude',S.gpsLon!==null?S.gpsLon.toFixed(6):'—',C.gps),
+        btn('📍 Set as Mission Start',setGpsAsStart,C.gps,!S.connected||S.gpsLat===null)
+      ),
+      card('🧭  COMPASS',C.accent,compass,
+        h('div',{style:{textAlign:'center',fontSize:18,fontWeight:700,color:C.compass,marginTop:4}},`${S.compassDeg.toFixed(1)}°`)
+      ),
+      h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}},
+        card('⚙ ENC #1',C.enc1,
+          h('div',{style:{fontSize:13,fontWeight:700,color:C.enc1,textAlign:'center'}},S.enc1Pos!==null?S.enc1Pos.toFixed(1)+'°':'—'),
+          h('div',{style:{fontSize:10,color:C.dim,textAlign:'center'}},S.enc1Rpm!==null?S.enc1Rpm.toFixed(1)+' RPM':'—')
+        ),
+        card('⚙ ENC #2',C.enc2,
+          h('div',{style:{fontSize:13,fontWeight:700,color:C.enc2,textAlign:'center'}},S.enc2Pos!==null?S.enc2Pos.toFixed(1)+'°':'—'),
+          h('div',{style:{fontSize:10,color:C.dim,textAlign:'center'}},S.enc2Rpm!==null?S.enc2Rpm.toFixed(1)+' RPM':'—')
+        )
+      ),
+      card('📡  COLLISION AVOIDANCE',C.accent,
+        h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}},
+          ...['FRONT','LEFT','RIGHT'].map((label,i)=>{
+            const val=[S.distFront,S.distLeft,S.distRight][i];
+            return h('div',{style:{background:C.card,borderRadius:6,padding:'8px 4px',textAlign:'center'}},
+              h('div',{style:{fontSize:9,color:C.dim}},label),
+              h('div',{style:{fontSize:14,fontWeight:700,color:distColor(val)}},val!==null?val.toFixed(0):'—'),
+              h('div',{style:{fontSize:9,color:C.dim}},'cm')
+            );
+          })
+        )
+      ),
+      card('📐  IMU (MPU6050)',C.accent,
+        S.imuAcc?row('Accel X/Y/Z',`${S.imuAcc.x.toFixed(1)}, ${S.imuAcc.y.toFixed(1)}, ${S.imuAcc.z.toFixed(1)}`,C.imuA):null,
+        S.imuGyro?row('Gyro X/Y/Z',`${S.imuGyro.x.toFixed(1)}, ${S.imuGyro.y.toFixed(1)}, ${S.imuGyro.z.toFixed(1)}`,C.imuG):null,
+        !S.imuAcc?h('div',{style:{color:C.dim,fontSize:11}},'No data'):null
+      ),
+      h('div',{style:{fontSize:10,color:C.dim,letterSpacing:'0.12em',fontWeight:700,padding:'14px 0 4px',textTransform:'uppercase'}},'LOG'),
+      logDiv
+    );
+  }
+
+  else if(S.tab==='map'){
+    // Render a lightweight placeholder only — map-container never moves in DOM
+    const mapPlaceholder=h('div',{id:'map-slot',style:{height:'270px',marginBottom:'8px',borderRadius:'10px',background:'#1a2030'}});
+    const modeRowEl=h('div',{style:{display:'flex',gap:'6px',marginBottom:'8px'}},
+      ...['boundary','start','point'].map(m=>{
+        const active=S.mapMode===m;
+        return h('button',{
+          onClick:()=>{update({mapMode:m});MapMgr.setMode(m);},
+          style:{flex:1,background:active?C.accent:C.card,color:active?C.bg:C.dim,
+            border:`1px solid ${active?C.accent:'#2a3347'}`,borderRadius:'7px',padding:'8px 0',
+            fontSize:'10px',fontWeight:700,cursor:'pointer'}},
+          m==='boundary'?'📐 Boundary':m==='start'?'📍 Start Pt':'📌 Add Point');
+      })
+    );
+    const statsEl=h('div',{style:{display:'flex',gap:'8px',marginBottom:'8px',fontSize:'11px'}},
+      h('span',{style:{color:C.dim}},'Boundary: ',h('b',{style:{color:C.accent}},String(S.boundary.length)+' pts')),
+      h('span',{style:{color:C.dim}},'WPs: ',h('b',{style:{color:C.accent}},String(S.waypoints.length))),
+      h('span',{style:{color:C.dim}},'Points: ',h('b',{style:{color:C.warn}},String(S.customPoints.length)))
+    );
+    const actRow=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px',marginBottom:'8px'}},
+      btn('🗑 Clear Boundary',clearBoundary,C.err,false,{marginBottom:0}),
+      btn('🔄 Reset All',resetAll,C.dim,false,{marginBottom:0})
+    );
+    let ptCardEl=null;
+    if(S.customPoints.length>0){
+      const ptList=h('div',{style:{maxHeight:'120px',overflowY:'auto'}},
+        ...S.customPoints.map((pt,i)=>h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'3px 0',borderBottom:'1px solid #2a3347'}},
+          h('span',{style:{fontSize:'10px',color:C.warn,fontWeight:700}},pt.label),
+          h('span',{style:{fontSize:'10px',color:C.dim}},`${pt.lat.toFixed(5)}, ${pt.lon.toFixed(5)}`),
+          h('button',{
+            onClick:()=>{const np=S.customPoints.filter((_,j)=>j!==i);update({customPoints:np});MapMgr.clearCustomPoints();np.forEach(p=>MapMgr.addCustomPoint([p.lat,p.lon],p.label));},
+            style:{background:'transparent',border:'none',color:C.err,cursor:'pointer',fontSize:'14px',padding:'0 4px'}
+          },'×')
+        ))
+      );
+      ptCardEl=card('📌  CUSTOM POINTS',C.warn,ptList,
+        btn('🗑 Clear All Points',()=>{update({customPoints:[]});MapMgr.clearCustomPoints();addLog('Custom points cleared.');},C.err,false,{marginBottom:0,marginTop:'6px'})
+      );
+    }
+    tabContent=h('div',null,
+      modeRowEl,mapPlaceholder,statsEl,actRow,
+      ptCardEl,
+      h('div',{style:{fontSize:'10px',color:C.dim,letterSpacing:'0.12em',fontWeight:700,padding:'14px 0 4px',textTransform:'uppercase'}},'LOG'),
+      logDiv
+    );
+    // Position the fixed map-container over the placeholder after DOM paint
+    setTimeout(()=>{
+      const slot=document.getElementById('map-slot');
+      const mc=document.getElementById('map-container');
+      if(!slot||!mc)return;
+      const r=slot.getBoundingClientRect();
+      mc.style.display='block';
+      mc.style.top=r.top+'px';
+      mc.style.left=r.left+'px';
+      mc.style.width=r.width+'px';
+      mc.style.height=r.height+'px';
+      MapMgr.invalidate();
+    },0);
+  }
+  else if(S.tab==='mission'){
+    const paramInp=(label,val,setter)=>h('div',{style:{display:'flex',alignItems:'center',marginBottom:6,gap:8}},
+      h('span',{style:{fontSize:11,color:C.dim,flex:1}},label),
+      h('input',{value:val,onInput:e=>setter(e.target.value),style:{background:C.card,border:'1px solid #2a3347',borderRadius:5,padding:'4px 8px',color:C.accent,fontSize:11,width:100}})
+    );
+    const pct=S.simTotal>0?Math.min(100,(S.simProgress/S.simTotal)*100):0;
+    tabContent=h('div',null,
+      card('⚙  PARAMETERS',C.accent,
+        paramInp('Row Spacing (m)',S.spacing,v=>S.spacing=v),
+        paramInp('Robot Speed (m/s)',S.robotSpeed,v=>S.robotSpeed=v),
+        paramInp('ESP32 IP',S.espIp,v=>S.espIp=v),
+        paramInp('Port',S.espPort,v=>S.espPort=v)
+      ),
+      card('⚡  ACTIONS',C.accent,
+        btn('⚡  Generate Path',generatePath,C.accent),
+        btn('📡  Send to ESP32',()=>addLog('Sending to ESP32…'),C.warn)
+      ),
+      card('▶  SIMULATION',C.accent,
+        h('div',{style:{display:'flex',gap:8,alignItems:'center',marginBottom:8}},
+          h('span',{style:{fontSize:11,color:C.dim}},'Speed:'),
+          ...['Slow','Med','Fast'].map(s=>h('button',{onClick:()=>update({simSpeed:s}),
+            style:{background:S.simSpeed===s?C.accent+'33':'transparent',color:S.simSpeed===s?C.accent:C.dim,
+            border:`1px solid ${S.simSpeed===s?C.accent:'#2a3347'}`,borderRadius:5,padding:'4px 10px',fontSize:10,cursor:'pointer'}},s))
+        ),
+        btn('▶  Simulate Path',startSimulation,C.accent,S.simRunning,{padding:'13px 10px',fontSize:13}),
+        h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:6}},
+          btn(S.simPaused?'▶  Resume':'⏸  Pause',pauseMission,C.warn,!S.simRunning,{marginBottom:0,padding:'11px 10px'}),
+          btn('⏹  Stop',stopMission,C.err,!S.simRunning,{marginBottom:0,padding:'11px 10px'})
+        ),
+        h('div',{id:'sim-wp-label',style:{fontSize:11,color:C.dim,marginBottom:4}},`Waypoint: ${Math.floor(S.simProgress)} / ${S.simTotal}`),
+        h('div',{style:{background:C.card,borderRadius:4,height:6,margin:'4px 0'}},
+          h('div',{id:'sim-progress-bar',style:{background:C.accent,width:`${pct}%`,height:'100%',borderRadius:4,transition:'width 0.3s'}})
+        )
+      ),
+      card('📊  MISSION TELEMETRY',C.accent,
+        ...[['⏱ Elapsed',S.telElapsed,'tel-elapsed'],['🏁 ETA',S.telEta,'tel-eta'],['✅ Covered (m)',S.telCovered,'tel-covered'],['📏 Remaining (m)',S.telLeft,'tel-left'],['📍 Next WP',S.telNextWp,'tel-nextwp']].map(([l,v,id])=>{
+          const valEl=h('span',{style:{fontSize:11,color:C.accent,fontWeight:700}},v);
+          valEl.id=id;
+          return h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}},
+            h('span',{style:{fontSize:11,color:C.dim}},l),valEl);
+        })
+      ),
+      card('📋  MISSION STATUS',C.accent,
+        ...[S.statRows,S.statWps,S.statDist,S.statTime,S.statStart].map(s=>h('div',{style:{fontSize:11,color:C.dim,marginBottom:3}},s))
+      ),
+      h('div',{style:{fontSize:10,color:C.dim,letterSpacing:'0.12em',fontWeight:700,padding:'14px 0 4px',textTransform:'uppercase'}},'LOG'),
+      logDiv
+    );
+  }
+
+  const scrollArea=h('div',{style:{padding:'12px 14px',flex:1,overflowY:'auto'}},tabContent);
+  const app=h('div',{style:{background:C.bg,minHeight:'100vh',maxWidth:420,margin:'0 auto',display:'flex',flexDirection:'column'}},
+    header,tabBar,scrollArea
+  );
+  root.appendChild(app);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+
+// ── PASSWORD LOCK ─────────────────────────────────────────────────────────────
+const PASS_HASH = 'e3fab8cfca713378c1e1bb428d3423884c66430e0cb46c8a9a818d39b2aa9d9b'; // Default: FarmBot2024
+let _lockTries = 0;
+const _maxTries = 5;
+let _lockUntil = 0;
+
+async function sha256(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+async function tryUnlock(){
+  const now=Date.now();
+  if(now<_lockUntil){
+    const secs=Math.ceil((_lockUntil-now)/1000);
+    showLockError(`Too many attempts. Wait ${secs}s.`);return;
+  }
+  const val=document.getElementById('lock-input').value;
+  const hash=await sha256(val);
+  if(hash===PASS_HASH){
+    const ls=document.getElementById('lock-screen');
+    ls.style.transition='opacity 0.4s';ls.style.opacity='0';
+    setTimeout(()=>ls.remove(),400);
+  } else {
+    _lockTries++;
+    document.getElementById('lock-box').classList.add('shake');
+    setTimeout(()=>document.getElementById('lock-box')?.classList.remove('shake'),400);
+    document.getElementById('lock-input').value='';
+    if(_lockTries>=_maxTries){
+      _lockUntil=Date.now()+30000;_lockTries=0;
+      showLockError('Too many attempts. Locked for 30s.');
+      document.getElementById('lock-attempts').textContent='';
+    } else {
+      const left=_maxTries-_lockTries;
+      showLockError('Incorrect password.');
+      document.getElementById('lock-attempts').textContent=`${left} attempt${left===1?'':'s'} remaining`;
+    }
+  }
+}
+
+function showLockError(msg){
+  const el=document.getElementById('lock-error');
+  if(el){el.textContent=msg;el.style.opacity=1;}
+}
+
+function toggleEye(){
+  const inp=document.getElementById('lock-input');
+  const eye=document.getElementById('lock-eye');
+  if(inp.type==='password'){inp.type='text';eye.textContent='🙈';}
+  else{inp.type='password';eye.textContent='👁';}
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  const inp=document.getElementById('lock-input');
+  if(inp) inp.addEventListener('keydown',e=>{if(e.key==='Enter')tryUnlock();});
+});
+
+window.addEventListener('DOMContentLoaded',()=>{
+  MapMgr.init();
+  renderApp();
+  subscribe(renderApp);
+  // Reposition map overlay on scroll or resize
+  window.addEventListener('resize',()=>{
+    if(S.tab==='map'){
+      const slot=document.getElementById('map-slot');
+      const mc=document.getElementById('map-container');
+      if(!slot||!mc)return;
+      const r=slot.getBoundingClientRect();
+      mc.style.top=r.top+'px';mc.style.left=r.left+'px';
+      mc.style.width=r.width+'px';mc.style.height=r.height+'px';
+      MapMgr.invalidate();
+    }
+  });
+  // Reposition on scroll inside the scroll area
+  document.addEventListener('scroll',()=>{
+    if(S.tab==='map'){
+      const slot=document.getElementById('map-slot');
+      const mc=document.getElementById('map-container');
+      if(!slot||!mc||mc.style.display==='none')return;
+      const r=slot.getBoundingClientRect();
+      mc.style.top=r.top+'px';mc.style.left=r.left+'px';
+    }
+  },true);
+});
+</script>
+</body>
+</html>
